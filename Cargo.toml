@@ -1,0 +1,20 @@
+[package]
+name = "signal-backup-decode"
+version = "0.1.0"
+authors = ["pajowu <pajowu@pajowu.de>"]
+build = "build.rs"
+
+[dependencies]
+openssl = "^0.10"
+hex = "0.3"
+protobuf = "1.5"
+byteorder = "1"
+rust-crypto = "^0.2"
+error-chain = "0.11"
+sqlite = "0.23"
+rust-ini = "0.11"
+clap = "2.31"
+tempfile = "3"
+
+[build-dependencies]
+protoc-rust = "1.5"
