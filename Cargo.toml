@@ -3,6 +3,10 @@ name = "signal-backup-decode"
 version = "0.1.0"
 authors = ["pajowu <pajowu@pajowu.de>"]
 build = "build.rs"
+description = "A simple tool to decode signal backups"
+readme = "README.md"
+license = "GPL-3.0"
+repository = "https://github.com/pajowu/signal-backup-decode"
 
 [dependencies]
 openssl = "^0.10"
