@@ -4,10 +4,15 @@ This repository contains a small programm to decode a backup produced by [Signal
 
 ## Installation
 
-This tool can be installed using `cargo`:
+**For building this tool, `protoc` has to be installed.**
+
+- Debian: ```apt install protobuf-compiler```
+- Arch: ```pacman -S protobuf```
+
+Once `protoc` is installed, this tool can be installed using `cargo`:
 
 ```
-cargo install signal-backup-decoder
+cargo install signal-backup-decode
 ```
 
 ## Usage
