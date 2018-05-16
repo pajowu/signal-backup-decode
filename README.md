@@ -4,13 +4,15 @@ This repository contains a small programm to decode a backup produced by [Signal
 
 ## Installation
 
+**Rust v1.26 or higher is required**
+
 ```
 cargo install signal-backup-decode
 ```
 
 ## Feature Flags
 
-This tool depends on parsed protoc files. A pre-generated version is included with in this repo, they can be regenerated using the feature flag `protobuf-rebuild`.
+This tool depends on parsed protoc files. A pre-generated version is included with in this repo, they can be regenerated using the feature flag `rebuild-protobuf`.
 
 **For regenerating the protobuf-files this tool, `protoc` has to be installed.**
 
@@ -20,7 +22,7 @@ This tool depends on parsed protoc files. A pre-generated version is included wi
 Once `protoc` is installed, this tool can be installed using `cargo`:
 
 ```
-cargo install --features "rebuild-protoc" signal-backup-decode
+cargo install --features "rebuild-protobuf" signal-backup-decode
 ```
 
 
