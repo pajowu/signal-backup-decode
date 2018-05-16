@@ -13,8 +13,8 @@ extern crate tempfile;
 
 use byteorder::{BigEndian, ReadBytesExt};
 use crypto::mac::Mac;
-use openssl::symm;
 use openssl::hash::{Hasher, MessageDigest};
+use openssl::symm;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::io::BufRead;
@@ -312,7 +312,7 @@ fn get_directory(base: &Path, name: &str) -> std::path::PathBuf {
 	folder
 }
 
-fn main() {
+fn main() -> Result<()> {
 	let matches = clap_app!(myapp =>
 		(name: crate_name!())
         (version: crate_version!())
@@ -406,10 +406,25 @@ fn main() {
 	decode_backup(&mut reader, &password, &attachment_folder, &avatar_folder, &config_folder, &connection, frame_callback, !matches.is_present("no_verify_mac")).unwrap();
 	if tmpdir.is_some() {
 		let t = tmpdir.unwrap();
-		std::fs::rename(t.path().join("signal_backup.sqlite"), sqlite_path).expect(
-			"Failed to move temporary sqlite to given sqlite path",
-		);
+		let sqlite_tmp_path = t.path().join("signal_backup.sqlite");
+		match std::fs::rename(&sqlite_tmp_path, &sqlite_path) {
+			Ok(_) => {
+				println!("Moved sqlite to {}", &sqlite_path.to_string_lossy());
+			},
+			Err(e) => {
+				println!(
+					"{}, Could not move {} to {}, trying copy",
+					e,
+					&sqlite_tmp_path.to_string_lossy(),
+					&sqlite_path.to_string_lossy()
+				);
+				std::fs::copy(&sqlite_tmp_path, &sqlite_path)?;
+				std::fs::remove_file(&sqlite_tmp_path)?;
+				println!("Copy successful, sqlite at {}", &sqlite_path.to_string_lossy());
+			},
+		}
 		t.close().unwrap();
 	}
 	println!();
+	Ok(())
 }

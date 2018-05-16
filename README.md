@@ -4,7 +4,15 @@ This repository contains a small programm to decode a backup produced by [Signal
 
 ## Installation
 
-**For building this tool, `protoc` has to be installed.**
+```
+cargo install signal-backup-decode
+```
+
+## Feature Flags
+
+This tool depends on parsed protoc files. A pre-generated version is included with in this repo, they can be regenerated using the feature flag `protobuf-rebuild`.
+
+**For regenerating the protobuf-files this tool, `protoc` has to be installed.**
 
 - Debian: ```apt install protobuf-compiler```
 - Arch: ```pacman -S protobuf```
@@ -12,8 +20,9 @@ This repository contains a small programm to decode a backup produced by [Signal
 Once `protoc` is installed, this tool can be installed using `cargo`:
 
 ```
-cargo install signal-backup-decode
+cargo install --features "rebuild-protoc" signal-backup-decode
 ```
+
 
 ## Usage
 

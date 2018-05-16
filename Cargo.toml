@@ -9,16 +9,20 @@ license = "GPL-3.0"
 repository = "https://github.com/pajowu/signal-backup-decode"
 
 [dependencies]
-openssl = "^0.10"
-hex = "0.3"
-protobuf = "1.5"
-byteorder = "1"
+openssl = "~0.10"
+hex = "~0.3"
+protobuf = "~1.6"
+byteorder = "~1"
 rust-crypto = "^0.2"
-error-chain = "0.11"
-sqlite = "0.23"
-rust-ini = "0.11"
-clap = "2.31"
-tempfile = "3"
+error-chain = "~0.11"
+sqlite = "~0.23"
+rust-ini = "~0.11"
+clap = "~2.31"
+tempfile = "~3"
 
 [build-dependencies]
-protoc-rust = "1.5"
+protoc-rust = {version = "1.6", optional = true}
+
+[features]
+default = []
+rebuild-protobuf = ["protoc-rust"]
