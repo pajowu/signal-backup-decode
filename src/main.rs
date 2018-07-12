@@ -236,6 +236,12 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 			}
 			attachment_count += 1;
 		} else if frame.has_statement() {
+			let statement = frame.get_statement().get_statement();
+			// In database version 9 signal added full text search and uses TRIGGERs to create the virtual tables. however this breaks when importing the data.
+			if statement.starts_with("CREATE TRIGGER") || statement.contains("_fts") {
+				continue
+			}
+
 			let mut statement = connection.prepare(frame.get_statement().get_statement())
 			                              .expect(&format!(
 				"Failed to prepare statement: {}",
@@ -276,7 +282,16 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 			}
 
 			// Run until statement is completed
-			while let Ok(sqlite::State::Row) = statement.next() {}
+			loop {
+				let s = statement.next();
+				match s {
+					Ok(sqlite::State::Row) => continue,
+					Err(e) => {
+						return Err(e.into())
+					}
+					Ok(sqlite::State::Done) => break
+				}
+			}
 		} else if frame.has_preference() {
 			let pref = frame.get_preference();
 			let config_file = config_folder.join(pref.get_file());
