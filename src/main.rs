@@ -238,7 +238,7 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 		} else if frame.has_statement() {
 			let statement = frame.get_statement().get_statement();
 			// In database version 9 signal added full text search and uses TRIGGERs to create the virtual tables. however this breaks when importing the data.
-			if statement.starts_with("CREATE TRIGGER") || statement.contains("_fts") {
+			if statement.starts_with("CREATE TRIGGER") || statement.contains("_fts") || statement.starts_with("CREATE TABLE sqlite_") {
 				continue
 			}
 
