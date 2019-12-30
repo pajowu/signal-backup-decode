@@ -1101,9 +1101,209 @@ impl ::protobuf::reflect::ProtobufValue for Attachment {
 }
 
 #[derive(PartialEq,Clone,Default)]
+pub struct Sticker {
+    // message fields
+    rowId: ::std::option::Option<u64>,
+    length: ::std::option::Option<u32>,
+    // special fields
+    unknown_fields: ::protobuf::UnknownFields,
+    cached_size: ::protobuf::CachedSize,
+}
+
+impl Sticker {
+    pub fn new() -> Sticker {
+        ::std::default::Default::default()
+    }
+
+    // optional uint64 rowId = 1;
+
+    pub fn clear_rowId(&mut self) {
+        self.rowId = ::std::option::Option::None;
+    }
+
+    pub fn has_rowId(&self) -> bool {
+        self.rowId.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_rowId(&mut self, v: u64) {
+        self.rowId = ::std::option::Option::Some(v);
+    }
+
+    pub fn get_rowId(&self) -> u64 {
+        self.rowId.unwrap_or(0)
+    }
+
+    // optional uint32 length = 2;
+
+    pub fn clear_length(&mut self) {
+        self.length = ::std::option::Option::None;
+    }
+
+    pub fn has_length(&self) -> bool {
+        self.length.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_length(&mut self, v: u32) {
+        self.length = ::std::option::Option::Some(v);
+    }
+
+    pub fn get_length(&self) -> u32 {
+        self.length.unwrap_or(0)
+    }
+}
+
+impl ::protobuf::Message for Sticker {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_uint64()?;
+                    self.rowId = ::std::option::Option::Some(tmp);
+                },
+                2 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_uint32()?;
+                    self.length = ::std::option::Option::Some(tmp);
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if let Some(v) = self.rowId {
+            my_size += ::protobuf::rt::value_size(1, v, ::protobuf::wire_format::WireTypeVarint);
+        }
+        if let Some(v) = self.length {
+            my_size += ::protobuf::rt::value_size(2, v, ::protobuf::wire_format::WireTypeVarint);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        if let Some(v) = self.rowId {
+            os.write_uint64(1, v)?;
+        }
+        if let Some(v) = self.length {
+            os.write_uint32(2, v)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> Sticker {
+        Sticker::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint64>(
+                    "rowId",
+                    |m: &Sticker| { &m.rowId },
+                    |m: &mut Sticker| { &mut m.rowId },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                    "length",
+                    |m: &Sticker| { &m.length },
+                    |m: &mut Sticker| { &mut m.length },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<Sticker>(
+                    "Sticker",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static Sticker {
+        static mut instance: ::protobuf::lazy::Lazy<Sticker> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const Sticker,
+        };
+        unsafe {
+            instance.get(Sticker::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for Sticker {
+    fn clear(&mut self) {
+        self.clear_rowId();
+        self.clear_length();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for Sticker {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Sticker {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Avatar {
     // message fields
     name: ::protobuf::SingularField<::std::string::String>,
+    recipientId: ::protobuf::SingularField<::std::string::String>,
     length: ::std::option::Option<u32>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
@@ -1151,6 +1351,42 @@ impl Avatar {
         }
     }
 
+    // optional string recipientId = 3;
+
+    pub fn clear_recipientId(&mut self) {
+        self.recipientId.clear();
+    }
+
+    pub fn has_recipientId(&self) -> bool {
+        self.recipientId.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_recipientId(&mut self, v: ::std::string::String) {
+        self.recipientId = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_recipientId(&mut self) -> &mut ::std::string::String {
+        if self.recipientId.is_none() {
+            self.recipientId.set_default();
+        }
+        self.recipientId.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_recipientId(&mut self) -> ::std::string::String {
+        self.recipientId.take().unwrap_or_else(|| ::std::string::String::new())
+    }
+
+    pub fn get_recipientId(&self) -> &str {
+        match self.recipientId.as_ref() {
+            Some(v) => &v,
+            None => "",
+        }
+    }
+
     // optional uint32 length = 2;
 
     pub fn clear_length(&mut self) {
@@ -1183,6 +1419,9 @@ impl ::protobuf::Message for Avatar {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name)?;
                 },
+                3 => {
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.recipientId)?;
+                },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
@@ -1205,6 +1444,9 @@ impl ::protobuf::Message for Avatar {
         if let Some(ref v) = self.name.as_ref() {
             my_size += ::protobuf::rt::string_size(1, &v);
         }
+        if let Some(ref v) = self.recipientId.as_ref() {
+            my_size += ::protobuf::rt::string_size(3, &v);
+        }
         if let Some(v) = self.length {
             my_size += ::protobuf::rt::value_size(2, v, ::protobuf::wire_format::WireTypeVarint);
         }
@@ -1216,6 +1458,9 @@ impl ::protobuf::Message for Avatar {
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.name.as_ref() {
             os.write_string(1, &v)?;
+        }
+        if let Some(ref v) = self.recipientId.as_ref() {
+            os.write_string(3, &v)?;
         }
         if let Some(v) = self.length {
             os.write_uint32(2, v)?;
@@ -1267,6 +1512,11 @@ impl ::protobuf::Message for Avatar {
                     |m: &Avatar| { &m.name },
                     |m: &mut Avatar| { &mut m.name },
                 ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "recipientId",
+                    |m: &Avatar| { &m.recipientId },
+                    |m: &mut Avatar| { &mut m.recipientId },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "length",
                     |m: &Avatar| { &m.length },
@@ -1295,6 +1545,7 @@ impl ::protobuf::Message for Avatar {
 impl ::protobuf::Clear for Avatar {
     fn clear(&mut self) {
         self.clear_name();
+        self.clear_recipientId();
         self.clear_length();
         self.unknown_fields.clear();
     }
@@ -1707,6 +1958,7 @@ pub struct BackupFrame {
     version: ::protobuf::SingularPtrField<DatabaseVersion>,
     end: ::std::option::Option<bool>,
     avatar: ::protobuf::SingularPtrField<Avatar>,
+    sticker: ::protobuf::SingularPtrField<Sticker>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
     cached_size: ::protobuf::CachedSize,
@@ -1933,6 +2185,39 @@ impl BackupFrame {
     pub fn get_avatar(&self) -> &Avatar {
         self.avatar.as_ref().unwrap_or_else(|| Avatar::default_instance())
     }
+
+    // optional .signal.Sticker sticker = 8;
+
+    pub fn clear_sticker(&mut self) {
+        self.sticker.clear();
+    }
+
+    pub fn has_sticker(&self) -> bool {
+        self.sticker.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_sticker(&mut self, v: Sticker) {
+        self.sticker = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_sticker(&mut self) -> &mut Sticker {
+        if self.sticker.is_none() {
+            self.sticker.set_default();
+        }
+        self.sticker.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_sticker(&mut self) -> Sticker {
+        self.sticker.take().unwrap_or_else(|| Sticker::new())
+    }
+
+    pub fn get_sticker(&self) -> &Sticker {
+        self.sticker.as_ref().unwrap_or_else(|| Sticker::default_instance())
+    }
 }
 
 impl ::protobuf::Message for BackupFrame {
@@ -1963,6 +2248,11 @@ impl ::protobuf::Message for BackupFrame {
             }
         };
         for v in &self.avatar {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
+        for v in &self.sticker {
             if !v.is_initialized() {
                 return false;
             }
@@ -1998,6 +2288,9 @@ impl ::protobuf::Message for BackupFrame {
                 },
                 7 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.avatar)?;
+                },
+                8 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.sticker)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -2038,6 +2331,10 @@ impl ::protobuf::Message for BackupFrame {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
+        if let Some(ref v) = self.sticker.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -2074,6 +2371,11 @@ impl ::protobuf::Message for BackupFrame {
         }
         if let Some(ref v) = self.avatar.as_ref() {
             os.write_tag(7, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
+        if let Some(ref v) = self.sticker.as_ref() {
+            os.write_tag(8, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
@@ -2154,6 +2456,11 @@ impl ::protobuf::Message for BackupFrame {
                     |m: &BackupFrame| { &m.avatar },
                     |m: &mut BackupFrame| { &mut m.avatar },
                 ));
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Sticker>>(
+                    "sticker",
+                    |m: &BackupFrame| { &m.sticker },
+                    |m: &mut BackupFrame| { &mut m.sticker },
+                ));
                 ::protobuf::reflect::MessageDescriptor::new::<BackupFrame>(
                     "BackupFrame",
                     fields,
@@ -2183,6 +2490,7 @@ impl ::protobuf::Clear for BackupFrame {
         self.clear_version();
         self.clear_end();
         self.clear_avatar();
+        self.clear_sticker();
         self.unknown_fields.clear();
     }
 }
@@ -2212,19 +2520,23 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x20\x01(\tR\x03key\x12\x14\n\x05value\x18\x03\x20\x01(\tR\x05value\"^\n\
     \nAttachment\x12\x14\n\x05rowId\x18\x01\x20\x01(\x04R\x05rowId\x12\"\n\
     \x0cattachmentId\x18\x02\x20\x01(\x04R\x0cattachmentId\x12\x16\n\x06leng\
-    th\x18\x03\x20\x01(\rR\x06length\"4\n\x06Avatar\x12\x12\n\x04name\x18\
-    \x01\x20\x01(\tR\x04name\x12\x16\n\x06length\x18\x02\x20\x01(\rR\x06leng\
-    th\"+\n\x0fDatabaseVersion\x12\x18\n\x07version\x18\x01\x20\x01(\rR\x07v\
-    ersion\",\n\x06Header\x12\x0e\n\x02iv\x18\x01\x20\x01(\x0cR\x02iv\x12\
-    \x12\n\x04salt\x18\x02\x20\x01(\x0cR\x04salt\"\xc4\x02\n\x0bBackupFrame\
-    \x12&\n\x06header\x18\x01\x20\x01(\x0b2\x0e.signal.HeaderR\x06header\x12\
-    2\n\tstatement\x18\x02\x20\x01(\x0b2\x14.signal.SqlStatementR\tstatement\
-    \x128\n\npreference\x18\x03\x20\x01(\x0b2\x18.signal.SharedPreferenceR\n\
-    preference\x122\n\nattachment\x18\x04\x20\x01(\x0b2\x12.signal.Attachmen\
-    tR\nattachment\x121\n\x07version\x18\x05\x20\x01(\x0b2\x17.signal.Databa\
-    seVersionR\x07version\x12\x10\n\x03end\x18\x06\x20\x01(\x08R\x03end\x12&\
-    \n\x06avatar\x18\x07\x20\x01(\x0b2\x0e.signal.AvatarR\x06avatarB1\n!org.\
-    thoughtcrime.securesms.backupB\x0cBackupProtos\
+    th\x18\x03\x20\x01(\rR\x06length\"7\n\x07Sticker\x12\x14\n\x05rowId\x18\
+    \x01\x20\x01(\x04R\x05rowId\x12\x16\n\x06length\x18\x02\x20\x01(\rR\x06l\
+    ength\"V\n\x06Avatar\x12\x12\n\x04name\x18\x01\x20\x01(\tR\x04name\x12\
+    \x20\n\x0brecipientId\x18\x03\x20\x01(\tR\x0brecipientId\x12\x16\n\x06le\
+    ngth\x18\x02\x20\x01(\rR\x06length\"+\n\x0fDatabaseVersion\x12\x18\n\x07\
+    version\x18\x01\x20\x01(\rR\x07version\",\n\x06Header\x12\x0e\n\x02iv\
+    \x18\x01\x20\x01(\x0cR\x02iv\x12\x12\n\x04salt\x18\x02\x20\x01(\x0cR\x04\
+    salt\"\xef\x02\n\x0bBackupFrame\x12&\n\x06header\x18\x01\x20\x01(\x0b2\
+    \x0e.signal.HeaderR\x06header\x122\n\tstatement\x18\x02\x20\x01(\x0b2\
+    \x14.signal.SqlStatementR\tstatement\x128\n\npreference\x18\x03\x20\x01(\
+    \x0b2\x18.signal.SharedPreferenceR\npreference\x122\n\nattachment\x18\
+    \x04\x20\x01(\x0b2\x12.signal.AttachmentR\nattachment\x121\n\x07version\
+    \x18\x05\x20\x01(\x0b2\x17.signal.DatabaseVersionR\x07version\x12\x10\n\
+    \x03end\x18\x06\x20\x01(\x08R\x03end\x12&\n\x06avatar\x18\x07\x20\x01(\
+    \x0b2\x0e.signal.AvatarR\x06avatar\x12)\n\x07sticker\x18\x08\x20\x01(\
+    \x0b2\x0f.signal.StickerR\x07stickerB1\n!org.thoughtcrime.securesms.back\
+    upB\x0cBackupProtos\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

@@ -11,7 +11,9 @@ extern crate sqlite;
 extern crate clap;
 extern crate tempfile;
 
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::ReadBytesExt;
+use std::convert::TryInto;
+use byteorder::{BigEndian};
 use crypto::mac::Mac;
 use openssl::hash::{Hasher, MessageDigest};
 use openssl::symm;
@@ -33,8 +35,8 @@ struct CipherData {
 }
 
 fn read_frame<T: Read>(r: &mut T, cipher_data: &mut Option<CipherData>, verify_mac: bool)
-                       -> Result<(u32, Vec<u8>)> {
-	let len = r.read_u32::<BigEndian>()?;
+                       -> Result<(usize, Vec<u8>)> {
+	let len = r.read_u32::<BigEndian>()?.try_into()?;
 	let mut frame_content = vec![0u8; len as usize];
 	r.read_exact(&mut frame_content)?;
 	match cipher_data {
@@ -113,9 +115,10 @@ fn derive_secrets(key: &[u8], info: &[u8], length: usize) -> ([u8; 32], [u8; 32]
 }
 
 fn read_attachment<R: Read, W: Write>(reader: &mut R, writer: &mut W,
-                                      cipher_data: &mut CipherData, length: u32,
+                                      cipher_data: &mut CipherData, length: usize,
                                       verify_mac: bool)
-                                      -> Result<u32> {
+                                      -> Result<usize> {
+
 	let mut decrypter = symm::Crypter::new(
 		symm::Cipher::aes_256_ctr(),
 		symm::Mode::Decrypt,
@@ -157,7 +160,7 @@ fn read_attachment<R: Read, W: Write>(reader: &mut R, writer: &mut W,
 
 fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Path,
                           avatar_folder: &Path, config_folder: &Path,
-                          connection: &sqlite::Connection, callback: fn(usize, usize, u32),
+                          connection: &sqlite::Connection, callback: fn(usize, usize, usize),
                           verify_mac: bool)
                           -> Result<usize> {
 	let mut cipher_data: Option<CipherData> = None;
@@ -179,7 +182,8 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 		                    frame.has_attachment(),
 		                    frame.has_version(),
 		                    frame.has_end(),
-		                    frame.has_avatar()];
+		                    frame.has_avatar(),
+		                    frame.has_sticker(),];
 		if frame_fields.iter().filter(|x| **x).count() != 1 {
 			panic!(
 				"Frame with an unsupported number of fields found, please report to author: {:?}",
@@ -211,7 +215,7 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 			));
 			if let &mut Some(ref mut c) = &mut cipher_data {
 				seek_position +=
-					read_attachment(&mut reader, &mut buffer, c, a.get_length(), verify_mac)?;
+					read_attachment(&mut reader, &mut buffer, c, a.get_length().try_into()?, verify_mac)?;
 			} else {
 				panic!("Attachment found before header, exiting");
 			}
@@ -230,9 +234,28 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 			));
 			if let &mut Some(ref mut c) = &mut cipher_data {
 				seek_position +=
-					read_attachment(&mut reader, &mut buffer, c, a.get_length(), verify_mac)?;
+					read_attachment(&mut reader, &mut buffer, c, a.get_length().try_into()?, verify_mac)?;
 			} else {
 				panic!("Attachment/Avatar found before header, exiting");
+			}
+			attachment_count += 1;
+		} else if frame.has_sticker() {
+			let a = frame.get_sticker();
+			let mut i = 0;
+			let mut path = avatar_folder.join(format!("{}_{}", a.get_rowId(), i));
+			if path.exists() {
+				i += 1;
+				path = avatar_folder.join(format!("{}_{}", a.get_rowId(), i));
+			}
+			let mut buffer = File::create(&path).expect(&format!(
+				"Failed to open file: {}",
+				path.to_string_lossy()
+			));
+			if let &mut Some(ref mut c) = &mut cipher_data {
+				seek_position +=
+					read_attachment(&mut reader, &mut buffer, c, a.get_length().try_into()?, verify_mac)?;
+			} else {
+				panic!("Attachment/Sticker found before header, exiting");
 			}
 			attachment_count += 1;
 		} else if frame.has_statement() {
@@ -309,7 +332,7 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 	Ok(frame_count)
 }
 
-fn frame_callback(frame_count: usize, attachment_count: usize, seek_position: u32) {
+fn frame_callback(frame_count: usize, attachment_count: usize, seek_position: usize) {
 	std::io::stdout().write(format!("Successfully exported {} frames, {} attachments, {} bytes into file\r", frame_count, attachment_count, seek_position).as_bytes()).expect("Error writing status to stdout");
 	std::io::stdout().flush().expect("Error flushing stdout");
 }

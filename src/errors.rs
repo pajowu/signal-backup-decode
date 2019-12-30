@@ -1,6 +1,7 @@
 error_chain! {
 	foreign_links {
 		Io(::std::io::Error);
+		TryFromIntError(::std::num::TryFromIntError);
 		OpenSSL(::openssl::error::ErrorStack);
 		Sqlite(::sqlite::Error);
 	}
