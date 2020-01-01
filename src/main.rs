@@ -159,7 +159,7 @@ fn read_attachment<R: Read, W: Write>(reader: &mut R, writer: &mut W,
 }
 
 fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Path,
-                          avatar_folder: &Path, config_folder: &Path,
+                          avatar_folder: &Path, sticker_folder: &Path, config_folder: &Path,
                           connection: &sqlite::Connection, callback: fn(usize, usize, usize),
                           verify_mac: bool)
                           -> Result<usize> {
@@ -242,10 +242,10 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 		} else if frame.has_sticker() {
 			let a = frame.get_sticker();
 			let mut i = 0;
-			let mut path = avatar_folder.join(format!("{}_{}", a.get_rowId(), i));
+			let mut path = sticker_folder.join(format!("{}_{}", a.get_rowId(), i));
 			if path.exists() {
 				i += 1;
-				path = avatar_folder.join(format!("{}_{}", a.get_rowId(), i));
+				path = sticker_folder.join(format!("{}_{}", a.get_rowId(), i));
 			}
 			let mut buffer = File::create(&path).expect(&format!(
 				"Failed to open file: {}",
@@ -367,6 +367,7 @@ fn main() -> Result<()> {
 	        (@arg sqlite_file: --("sqlite-path") <sqlite_path> "File to store the sqlite database in [default: output_path/signal_backup.db]")
 	        (@arg attachment_path: --("attachment-path") default_value[attachments] "Directory to save attachments to")
 	        (@arg avatar_path: --("avatar-path") default_value[avatars] "Directory to save avatar images to")
+	        (@arg sticker_path: --("sticker-path") default_value[stickers] "Directory to save sticker images to")
 	        (@arg config_path: --("config-path") default_value[config] "Directory to save config files to")
 	    )
 	    (@arg no_tmp_sqlite: --("no-tmp-sqlite") "Do not use a temporary file for the sqlite database")
@@ -397,6 +398,7 @@ fn main() -> Result<()> {
 	let attachment_folder =
 		get_directory(output_path, matches.value_of("attachment_path").unwrap());
 	let avatar_folder = get_directory(output_path, matches.value_of("avatar_path").unwrap());
+	let sticker_folder = get_directory(output_path, matches.value_of("sticker_path").unwrap());
 	let config_folder = get_directory(output_path, matches.value_of("config_path").unwrap());
 
 	let sqlite_path = match matches.value_of("sqlite_file") {
@@ -441,7 +443,7 @@ fn main() -> Result<()> {
 		},
 	};
 
-	decode_backup(&mut reader, &password, &attachment_folder, &avatar_folder, &config_folder, &connection, frame_callback, !matches.is_present("no_verify_mac")).unwrap();
+	decode_backup(&mut reader, &password, &attachment_folder, &avatar_folder, &sticker_folder, &config_folder, &connection, frame_callback, !matches.is_present("no_verify_mac")).unwrap();
 	if tmpdir.is_some() {
 		let t = tmpdir.unwrap();
 		let sqlite_tmp_path = t.path().join("signal_backup.sqlite");
