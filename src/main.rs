@@ -364,7 +364,7 @@ fn main() -> Result<()> {
 	    (@group output_options =>
         	(@attributes !required +multiple)
 	        (@arg output_path: -o --("output-path") [FOLDER] "Directory to save output to")
-	        (@arg sqlite_file: --("sqlite-path") <sqlite_path> "File to store the sqlite database in [default: output_path/signal_backup.db]")
+	        (@arg sqlite_file: --("sqlite-path") +takes_value "File to store the sqlite database in [default: output_path/signal_backup.db]")
 	        (@arg attachment_path: --("attachment-path") default_value[attachments] "Directory to save attachments to")
 	        (@arg avatar_path: --("avatar-path") default_value[avatars] "Directory to save avatar images to")
 	        (@arg sticker_path: --("sticker-path") default_value[stickers] "Directory to save sticker images to")
