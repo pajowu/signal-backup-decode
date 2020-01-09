@@ -358,7 +358,7 @@ fn main() -> Result<()> {
         (about: crate_description!())
         (@group password =>
         	(@attributes +required !multiple)
-	        (@arg password_string: -p --("password") [PASSWORD] "Backup password (30 digits, no spaces)")
+	        (@arg password_string: -p --("password") [PASSWORD] "Backup password (30 digits, with or without spaces)")
 	        (@arg password_file: -f --("password_file") [FILE] "File to read the Backup password from")
 	    )
 	    (@group output_options =>
@@ -406,18 +406,20 @@ fn main() -> Result<()> {
 		None => output_path.join("signal_backup.db"),
 	};
 
-	let password = match matches.value_of("password_string") {
-		Some(p) => p.as_bytes().to_vec(),
+	let mut password = match matches.value_of("password_string") {
+		Some(p) => String::from(p),
 		None => {
 			let password_file = BufReader::new(File::open(matches.value_of("password_file").unwrap()).expect("Unable to open password file"));
 			password_file.lines()
 			             .next()
 			             .expect("Password file is empty")
 			             .expect("Unable to read from password file")
-			             .as_bytes()
-			             .to_vec()
 		},
 	};
+
+	password.retain(|c| c >= '0' && c <= '9');
+
+	let password = password.as_bytes().to_vec();
 
 	let file = File::open(input_file).expect("Backup file could not be opened");
 	let mut reader = BufReader::new(file);

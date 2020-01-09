@@ -50,7 +50,7 @@ OPTIONS:
         --config-path <config_path>            Directory to save config files to [default: config]
     -o, --output-path <FOLDER>                 Directory to save output to
     -f, --password_file <FILE>                 File to read the Backup password from
-    -p, --password <PASSWORD>                  Backup password (30 digits, no spaces)
+    -p, --password <PASSWORD>                  Backup password (30 digits, with or without spaces)
         --sqlite-path <sqlite_path>            File to store the sqlite database in [default:
                                                output_path/signal_backup.db]
 
