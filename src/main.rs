@@ -11,16 +11,16 @@ extern crate sqlite;
 extern crate clap;
 extern crate tempfile;
 
+use byteorder::BigEndian;
 use byteorder::ReadBytesExt;
-use std::convert::TryInto;
-use byteorder::{BigEndian};
 use crypto::mac::Mac;
 use openssl::hash::{Hasher, MessageDigest};
 use openssl::symm;
+use std::convert::TryInto;
 use std::fs::File;
-use std::io::{Read, Write};
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::{Read, Write};
 use std::iter::Iterator;
 
 mod Backups;
@@ -29,19 +29,22 @@ use errors::*;
 use std::path::Path;
 
 struct CipherData {
-	hmac:       crypto::hmac::Hmac<crypto::sha2::Sha256>,
+	hmac: crypto::hmac::Hmac<crypto::sha2::Sha256>,
 	cipher_key: [u8; 32],
-	counter:    Vec<u8>,
+	counter: Vec<u8>,
 }
 
-fn read_frame<T: Read>(r: &mut T, cipher_data: &mut Option<CipherData>, verify_mac: bool)
-                       -> Result<(usize, Vec<u8>)> {
+fn read_frame<T: Read>(
+	r: &mut T,
+	cipher_data: &mut Option<CipherData>,
+	verify_mac: bool,
+) -> Result<(usize, Vec<u8>)> {
 	let len = r.read_u32::<BigEndian>()?.try_into()?;
 	let mut frame_content = vec![0u8; len as usize];
 	r.read_exact(&mut frame_content)?;
-	match cipher_data {
-		&mut None => Ok((len, frame_content)),
-		&mut Some(ref mut cipher_data) => {
+	match *cipher_data {
+		None => Ok((len, frame_content)),
+		Some(ref mut cipher_data) => {
 			let frame_data = &frame_content[..frame_content.len() - 10];
 			if verify_mac {
 				let frame_mac = &frame_content[frame_content.len() - 10..];
@@ -50,21 +53,20 @@ fn read_frame<T: Read>(r: &mut T, cipher_data: &mut Option<CipherData>, verify_m
 				let calculated_mac = &hmac_result.code()[..10];
 				cipher_data.hmac.reset();
 				if !crypto::util::fixed_time_eq(calculated_mac, frame_mac) {
-					return Err(ErrorKind::MacVerificationError(calculated_mac.to_vec(),
-						frame_mac.to_vec()).into())
+					return Err(ErrorKind::MacVerificationError(
+						calculated_mac.to_vec(),
+						frame_mac.to_vec(),
+					)
+					.into());
 				}
 			}
-			let plaintext = decrypt(
-				&cipher_data.cipher_key,
-				&mut cipher_data.counter,
-				frame_data,
-			)?;
+			let plaintext = decrypt(&cipher_data.cipher_key, &cipher_data.counter, frame_data)?;
 			increase_counter(&mut cipher_data.counter, None);
 			Ok((len, plaintext))
-		},
+		}
 	}
 }
-fn decrypt(key: &[u8; 32], counter: &Vec<u8>, ciphertext: &[u8]) -> Result<Vec<u8>> {
+fn decrypt(key: &[u8; 32], counter: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
 	let mut decrypter = symm::Crypter::new(
 		symm::Cipher::aes_256_ctr(),
 		symm::Mode::Decrypt,
@@ -83,8 +85,9 @@ fn increase_counter(counter: &mut Vec<u8>, start: Option<usize>) {
 	loop {
 		if counter[i] < 255 {
 			counter[i] += 1;
-			break
-		} else if counter[i] == 255 {
+			break;
+		} else {
+			// else if counter[i] == 255 unnecessary
 			counter[i] = 0;
 			i -= 1
 		}
@@ -111,14 +114,16 @@ fn derive_secrets(key: &[u8], info: &[u8], length: usize) -> ([u8; 32], [u8; 32]
 	let mut sec2: [u8; 32] = Default::default();
 	sec1.copy_from_slice(&sec[..32]);
 	sec2.copy_from_slice(&sec[32..]);
-	return (sec1, sec2)
+	(sec1, sec2)
 }
 
-fn read_attachment<R: Read, W: Write>(reader: &mut R, writer: &mut W,
-                                      cipher_data: &mut CipherData, length: usize,
-                                      verify_mac: bool)
-                                      -> Result<usize> {
-
+fn read_attachment<R: Read, W: Write>(
+	reader: &mut R,
+	writer: &mut W,
+	cipher_data: &mut CipherData,
+	length: usize,
+	verify_mac: bool,
+) -> Result<usize> {
 	let mut decrypter = symm::Crypter::new(
 		symm::Cipher::aes_256_ctr(),
 		symm::Mode::Decrypt,
@@ -140,7 +145,7 @@ fn read_attachment<R: Read, W: Write>(reader: &mut R, writer: &mut W,
 		}
 		let mut count = decrypter.update(&buffer, &mut plaintext)?;
 		count += decrypter.finalize(&mut plaintext[count..])?;
-		writer.write(&plaintext[..count])?;
+		writer.write_all(&plaintext[..count])?;
 	}
 
 	let mut mac = [0u8; 10];
@@ -150,19 +155,26 @@ fn read_attachment<R: Read, W: Write>(reader: &mut R, writer: &mut W,
 		let calculated_mac = &hmac_result.code()[..10];
 		cipher_data.hmac.reset();
 		if !crypto::util::fixed_time_eq(calculated_mac, &mac) {
-			return Err(ErrorKind::MacVerificationError(calculated_mac.to_vec(),
-				mac.to_vec()).into())
+			return Err(
+				ErrorKind::MacVerificationError(calculated_mac.to_vec(), mac.to_vec()).into(),
+			);
 		}
 	}
 	increase_counter(&mut cipher_data.counter, None);
 	Ok(length)
 }
 
-fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Path,
-                          avatar_folder: &Path, sticker_folder: &Path, config_folder: &Path,
-                          connection: &sqlite::Connection, callback: fn(usize, usize, usize),
-                          verify_mac: bool)
-                          -> Result<usize> {
+fn decode_backup<R: Read>(
+	mut reader: R,
+	password: &[u8],
+	attachment_folder: &Path,
+	avatar_folder: &Path,
+	sticker_folder: &Path,
+	config_folder: &Path,
+	connection: &sqlite::Connection,
+	callback: fn(usize, usize, usize),
+	verify_mac: bool,
+) -> Result<usize> {
 	let mut cipher_data: Option<CipherData> = None;
 
 	let mut frame_count = 0;
@@ -174,16 +186,18 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 			read_frame(&mut reader, &mut cipher_data, verify_mac)?;
 		seek_position += consumed_bytes;
 		let frame = protobuf::parse_from_bytes::<Backups::BackupFrame>(&frame_content)
-			.expect(&format!("Could not parse frame from {:?}", frame_content));
+			.unwrap_or_else(|_| panic!("Could not parse frame from {:?}", frame_content));
 
-		let frame_fields = [frame.has_header(),
-		                    frame.has_statement(),
-		                    frame.has_preference(),
-		                    frame.has_attachment(),
-		                    frame.has_version(),
-		                    frame.has_end(),
-		                    frame.has_avatar(),
-		                    frame.has_sticker(),];
+		let frame_fields = [
+			frame.has_header(),
+			frame.has_statement(),
+			frame.has_preference(),
+			frame.has_attachment(),
+			frame.has_version(),
+			frame.has_end(),
+			frame.has_avatar(),
+			frame.has_sticker(),
+		];
 		if frame_fields.iter().filter(|x| **x).count() != 1 {
 			panic!(
 				"Frame with an unsupported number of fields found, please report to author: {:?}",
@@ -191,16 +205,13 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 			);
 		}
 		if frame.has_header() {
-			let (cipher_key, mac_key) =
-				generate_keys(&password, frame.get_header().get_salt()).expect(
-					"Error generating keys",
-				);
-			cipher_data = Some(CipherData { hmac: crypto::hmac::Hmac::new(
-				crypto::sha2::Sha256::new(),
-				&mac_key,
-			),
-			                                cipher_key,
-			                                counter: frame.get_header().get_iv().to_vec(), })
+			let (cipher_key, mac_key) = generate_keys(&password, frame.get_header().get_salt())
+				.expect("Error generating keys");
+			cipher_data = Some(CipherData {
+				hmac: crypto::hmac::Hmac::new(crypto::sha2::Sha256::new(), &mac_key),
+				cipher_key,
+				counter: frame.get_header().get_iv().to_vec(),
+			})
 		} else if cipher_data.is_none() {
 			panic!("Read non-header frame before header frame");
 		} else if frame.has_version() {
@@ -209,13 +220,20 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 			let a = frame.get_attachment();
 			let attachment_path =
 				attachment_folder.join(format!("{}_{}", a.get_attachmentId(), a.get_rowId()));
-			let mut buffer = File::create(&attachment_path).expect(&format!(
-				"Failed to open attachment file: {}",
-				attachment_path.to_string_lossy()
-			));
-			if let &mut Some(ref mut c) = &mut cipher_data {
-				seek_position +=
-					read_attachment(&mut reader, &mut buffer, c, a.get_length().try_into()?, verify_mac)?;
+			let mut buffer = File::create(&attachment_path).unwrap_or_else(|_| {
+				panic!(
+					"Failed to open attachment file: {}",
+					attachment_path.to_string_lossy()
+				)
+			});
+			if let Some(ref mut c) = cipher_data {
+				seek_position += read_attachment(
+					&mut reader,
+					&mut buffer,
+					c,
+					a.get_length().try_into()?,
+					verify_mac,
+				)?;
 			} else {
 				panic!("Attachment found before header, exiting");
 			}
@@ -228,13 +246,16 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 				i += 1;
 				path = avatar_folder.join(format!("{}_{}", a.get_name(), i));
 			}
-			let mut buffer = File::create(&path).expect(&format!(
-				"Failed to open file: {}",
-				path.to_string_lossy()
-			));
-			if let &mut Some(ref mut c) = &mut cipher_data {
-				seek_position +=
-					read_attachment(&mut reader, &mut buffer, c, a.get_length().try_into()?, verify_mac)?;
+			let mut buffer = File::create(&path)
+				.unwrap_or_else(|_| panic!("Failed to open file: {}", path.to_string_lossy()));
+			if let Some(ref mut c) = cipher_data {
+				seek_position += read_attachment(
+					&mut reader,
+					&mut buffer,
+					c,
+					a.get_length().try_into()?,
+					verify_mac,
+				)?;
 			} else {
 				panic!("Attachment/Avatar found before header, exiting");
 			}
@@ -247,13 +268,16 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 				i += 1;
 				path = sticker_folder.join(format!("{}_{}", a.get_rowId(), i));
 			}
-			let mut buffer = File::create(&path).expect(&format!(
-				"Failed to open file: {}",
-				path.to_string_lossy()
-			));
-			if let &mut Some(ref mut c) = &mut cipher_data {
-				seek_position +=
-					read_attachment(&mut reader, &mut buffer, c, a.get_length().try_into()?, verify_mac)?;
+			let mut buffer = File::create(&path)
+				.unwrap_or_else(|_| panic!("Failed to open file: {}", path.to_string_lossy()));
+			if let Some(ref mut c) = cipher_data {
+				seek_position += read_attachment(
+					&mut reader,
+					&mut buffer,
+					c,
+					a.get_length().try_into()?,
+					verify_mac,
+				)?;
 			} else {
 				panic!("Attachment/Sticker found before header, exiting");
 			}
@@ -261,44 +285,63 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 		} else if frame.has_statement() {
 			let statement = frame.get_statement().get_statement();
 			// In database version 9 signal added full text search and uses TRIGGERs to create the virtual tables. however this breaks when importing the data.
-			if statement.starts_with("CREATE TRIGGER") || statement.contains("_fts") || statement.starts_with("CREATE TABLE sqlite_") {
-				continue
+			if statement.starts_with("CREATE TRIGGER")
+				|| statement.contains("_fts")
+				|| statement.starts_with("CREATE TABLE sqlite_")
+			{
+				continue;
 			}
 
-			let mut statement = connection.prepare(frame.get_statement().get_statement())
-			                              .expect(&format!(
-				"Failed to prepare statement: {}",
-				frame.get_statement().get_statement()
-			));
+			let mut statement = connection
+				.prepare(frame.get_statement().get_statement())
+				.unwrap_or_else(|_| {
+					panic!(
+						"Failed to prepare statement: {}",
+						frame.get_statement().get_statement()
+					)
+				});
 
 			for (i, param) in frame.get_statement().get_parameters().iter().enumerate() {
 				if param.has_stringParamter() {
-					statement.bind(i + 1, param.get_stringParamter())
-					         .expect(&format!(
-						"Error binding string parameter: {}",
-						param.get_stringParamter()
-					));
+					statement
+						.bind(i + 1, param.get_stringParamter())
+						.unwrap_or_else(|_| {
+							panic!(
+								"Error binding string parameter: {}",
+								param.get_stringParamter()
+							)
+						});
 				} else if param.has_integerParameter() {
-					statement.bind(i + 1, param.get_integerParameter() as i64)
-					         .expect(&format!(
-						"Error binding integer parameter: {}",
-						param.get_integerParameter()
-					));
+					statement
+						.bind(i + 1, param.get_integerParameter() as i64)
+						.unwrap_or_else(|_| {
+							panic!(
+								"Error binding integer parameter: {}",
+								param.get_integerParameter()
+							)
+						});
 				} else if param.has_doubleParameter() {
-					statement.bind(i + 1, param.get_doubleParameter())
-					         .expect(&format!(
-						"Error binding double parameter: {}",
-						param.get_doubleParameter()
-					));
+					statement
+						.bind(i + 1, param.get_doubleParameter())
+						.unwrap_or_else(|_| {
+							panic!(
+								"Error binding double parameter: {}",
+								param.get_doubleParameter()
+							)
+						});
 				} else if param.has_blobParameter() {
-					statement.bind(i + 1, param.get_blobParameter())
-					         .expect(&format!(
-						"Error binding blob parameter: {:?}",
-						param.get_blobParameter()
-					));
+					statement
+						.bind(i + 1, param.get_blobParameter())
+						.unwrap_or_else(|_| {
+							panic!(
+								"Error binding blob parameter: {:?}",
+								param.get_blobParameter()
+							)
+						});
 				} else if param.has_nullparameter() {
-					statement.bind(i + 1, ())
-					         .expect("Error binding null parameter");
+					statement
+						.bind(i + 1, ())
+						.expect("Error binding null parameter");
 				} else {
 					panic!("Parameter type not known {:?}", param);
 				}
@@ -309,20 +352,19 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 				let s = statement.next();
 				match s {
 					Ok(sqlite::State::Row) => continue,
-					Err(e) => {
-						return Err(e.into())
-					}
-					Ok(sqlite::State::Done) => break
+					Err(e) => return Err(e.into()),
+					Ok(sqlite::State::Done) => break,
 				}
 			}
 		} else if frame.has_preference() {
 			let pref = frame.get_preference();
 			let config_file = config_folder.join(pref.get_file());
-			let mut conf = ini::Ini::load_from_file(&config_file).unwrap_or(ini::Ini::new());
-			conf.with_section(None::<String>).set(pref.get_key(), pref.get_value());
+			let mut conf = ini::Ini::load_from_file(&config_file).unwrap_or_default();
+			conf.with_section(None::<String>)
+				.set(pref.get_key(), pref.get_value());
 			conf.write_to_file(&config_file)?;
 		} else if frame.has_end() {
-			break
+			break;
 		} else {
 			panic!("Unsupported Frame: {:?}", frame);
 		}
@@ -333,17 +375,23 @@ fn decode_backup<R: Read>(mut reader: R, password: &[u8], attachment_folder: &Pa
 }
 
 fn frame_callback(frame_count: usize, attachment_count: usize, seek_position: usize) {
-	std::io::stdout().write(format!("Successfully exported {} frames, {} attachments, {} bytes into file\r", frame_count, attachment_count, seek_position).as_bytes()).expect("Error writing status to stdout");
+	std::io::stdout()
+		.write_all(
+			format!(
+				"Successfully exported {} frames, {} attachments, {} bytes into file\r",
+				frame_count, attachment_count, seek_position
+			)
+			.as_bytes(),
+		)
+		.expect("Error writing status to stdout");
 	std::io::stdout().flush().expect("Error flushing stdout");
 }
 
 fn get_directory(base: &Path, name: &str) -> std::path::PathBuf {
 	let folder = base.join(name);
 	if !folder.exists() {
-		std::fs::create_dir(&folder).expect(&format!(
-			"{} could not be created",
-			folder.to_string_lossy()
-		));
+		std::fs::create_dir(&folder)
+			.unwrap_or_else(|_| panic!("{} could not be created", folder.to_string_lossy()));
 	} else if !folder.is_dir() {
 		panic!("{} exists and is not a directory", folder.to_string_lossy());
 	}
@@ -377,17 +425,16 @@ fn main() -> Result<()> {
 
 	let input_file = Path::new(matches.value_of("INPUT").unwrap());
 
-	let output_path = Path::new(
-		matches.value_of("output_path")
-		       .unwrap_or(input_file.file_stem().unwrap().to_str().expect(
-			"output_path not given and could not be automatically determined",
-		)),
-	);
+	let output_path = Path::new(matches.value_of("output_path").unwrap_or_else(|| {
+		input_file
+			.file_stem()
+			.unwrap()
+			.to_str()
+			.expect("output_path not given and could not be automatically determined")
+	}));
 	if !output_path.exists() {
-		std::fs::create_dir(&output_path).expect(&format!(
-			"{} could not be created",
-			output_path.to_string_lossy()
-		));
+		std::fs::create_dir(&output_path)
+			.unwrap_or_else(|_| panic!("{} could not be created", output_path.to_string_lossy()));
 	} else if !output_path.is_dir() {
 		panic!(
 			"{} exists and is not a directory",
@@ -409,12 +456,16 @@ fn main() -> Result<()> {
 	let mut password = match matches.value_of("password_string") {
 		Some(p) => String::from(p),
 		None => {
-			let password_file = BufReader::new(File::open(matches.value_of("password_file").unwrap()).expect("Unable to open password file"));
-			password_file.lines()
-			             .next()
-			             .expect("Password file is empty")
-			             .expect("Unable to read from password file")
-		},
+			let password_file = BufReader::new(
+				File::open(matches.value_of("password_file").unwrap())
+					.expect("Unable to open password file"),
+			);
+			password_file
+				.lines()
+				.next()
+				.expect("Password file is empty")
+				.expect("Unable to read from password file")
+		}
 	};
 
 	password.retain(|c| c >= '0' && c <= '9');
@@ -426,33 +477,37 @@ fn main() -> Result<()> {
 
 	let mut tmpdir: Option<tempfile::TempDir> = None;
 
-	let connection = match matches.is_present("no_tmp_sqlite") {
-		true => sqlite::open(&sqlite_path).expect(&format!(
-			"Could not open database file: {:?}",
-			sqlite_path
-		)),
-		false => {
-			let t = tempfile::tempdir().expect(
-				"Failed to create tmpdir. Hint: Try running with --no-tmp-sqlite",
-			);
-			let sqlite_path = t.path().join("signal_backup.sqlite");
-			tmpdir = Some(t);
-			let c = sqlite::open(&sqlite_path).expect(&format!(
-				"Could not open database file: {:?}",
-				sqlite_path
-			));
-			c
-		},
+	let connection = if matches.is_present("no_tmp_sqlite") {
+		sqlite::open(&sqlite_path)
+			.unwrap_or_else(|_| panic!("Could not open database file: {:?}", sqlite_path))
+	} else {
+		let t = tempfile::tempdir()
+			.expect("Failed to create tmpdir. Hint: Try running with --no-tmp-sqlite");
+		let sqlite_path = t.path().join("signal_backup.sqlite");
+		tmpdir = Some(t);
+		sqlite::open(&sqlite_path)
+			.unwrap_or_else(|_| panic!("Could not open database file: {:?}", sqlite_path))
 	};
 
-	decode_backup(&mut reader, &password, &attachment_folder, &avatar_folder, &sticker_folder, &config_folder, &connection, frame_callback, !matches.is_present("no_verify_mac")).unwrap();
+	decode_backup(
+		&mut reader,
+		&password,
+		&attachment_folder,
+		&avatar_folder,
+		&sticker_folder,
+		&config_folder,
+		&connection,
+		frame_callback,
+		!matches.is_present("no_verify_mac"),
+	)
+	.unwrap();
 	if tmpdir.is_some() {
 		let t = tmpdir.unwrap();
 		let sqlite_tmp_path = t.path().join("signal_backup.sqlite");
 		match std::fs::rename(&sqlite_tmp_path, &sqlite_path) {
 			Ok(_) => {
 				println!("Moved sqlite to {}", &sqlite_path.to_string_lossy());
-			},
+			}
 			Err(e) => {
 				println!(
 					"{}, Could not move {} to {}, trying copy",
@@ -462,8 +517,11 @@ fn main() -> Result<()> {
 				);
 				std::fs::copy(&sqlite_tmp_path, &sqlite_path)?;
 				std::fs::remove_file(&sqlite_tmp_path)?;
-				println!("Copy successful, sqlite at {}", &sqlite_path.to_string_lossy());
-			},
+				println!(
+					"Copy successful, sqlite at {}",
+					&sqlite_path.to_string_lossy()
+				);
+			}
 		}
 		t.close().unwrap();
 	}
