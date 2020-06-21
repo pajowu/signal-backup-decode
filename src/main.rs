@@ -25,7 +25,7 @@ use std::iter::Iterator;
 
 mod Backups;
 mod errors;
-use errors::*;
+use crate::errors::*;
 use std::path::Path;
 
 struct CipherData {
