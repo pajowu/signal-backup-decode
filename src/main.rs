@@ -9,11 +9,16 @@ extern crate ini;
 extern crate sqlite;
 #[macro_use]
 extern crate clap;
+extern crate anyhow;
+extern crate log;
 extern crate tempfile;
 
+use anyhow::anyhow;
 use byteorder::BigEndian;
 use byteorder::ReadBytesExt;
 use crypto::mac::Mac;
+use log::error;
+use log::info;
 use openssl::hash::{Hasher, MessageDigest};
 use openssl::symm;
 use std::convert::TryInto;
@@ -25,7 +30,6 @@ use std::iter::Iterator;
 
 mod Backups;
 mod errors;
-use crate::errors::*;
 use std::path::Path;
 
 struct CipherData {
@@ -53,11 +57,11 @@ fn read_frame<T: Read>(
 				let calculated_mac = &hmac_result.code()[..10];
 				cipher_data.hmac.reset();
 				if !crypto::util::fixed_time_eq(calculated_mac, frame_mac) {
-					return Err(ErrorKind::MacVerificationError(
+					return Err(anyhow!(
+						"MacVerificationError, {:?}, {:?}.",
 						calculated_mac.to_vec(),
 						frame_mac.to_vec(),
-					)
-					.into());
+					));
 				}
 			}
 			let plaintext = decrypt(&cipher_data.cipher_key, &cipher_data.counter, frame_data)?;
@@ -155,9 +159,11 @@ fn read_attachment<R: Read, W: Write>(
 		let calculated_mac = &hmac_result.code()[..10];
 		cipher_data.hmac.reset();
 		if !crypto::util::fixed_time_eq(calculated_mac, &mac) {
-			return Err(
-				ErrorKind::MacVerificationError(calculated_mac.to_vec(), mac.to_vec()).into(),
-			);
+			return Err(anyhow!(
+				"MacVerificationError, {:?}, {:?}.",
+				calculated_mac.to_vec(),
+				mac.to_vec()
+			));
 		}
 	}
 	increase_counter(&mut cipher_data.counter, None);
@@ -398,7 +404,7 @@ fn get_directory(base: &Path, name: &str) -> std::path::PathBuf {
 	folder
 }
 
-fn main() -> Result<()> {
+fn run() -> Result<()> {
 	let matches = clap_app!(myapp =>
 		(name: crate_name!())
         (version: crate_version!())
@@ -527,4 +533,30 @@ fn main() -> Result<()> {
 	}
 	println!();
 	Ok(())
+}
+
+fn main() {
+	// build config structure
+	//let args: Vec<String> = std::env::args().collect();
+	//let config = signal_backup_decode::args::Config::new(&args).unwrap_or_else(|e| {
+	//    eprintln!("Problem parsing arguments: {}.", e);
+	//    std::process::exit(1);
+	//});
+
+	simplelog::TermLogger::init(
+		log::LevelFilter::Info,
+		simplelog::Config::default(),
+		simplelog::TerminalMode::Mixed,
+	)
+	.unwrap();
+
+	// measuring runtime and run program
+	let now = std::time::Instant::now();
+
+	if let Err(e) = run() {
+		error!("{}.", e);
+		std::process::exit(1);
+	}
+
+	info! {"Runtime duration: {} seconds", now.elapsed().as_secs()};
 }
