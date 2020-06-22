@@ -1,11 +1,9 @@
 extern crate byteorder;
 extern crate crypto;
 extern crate hex;
+extern crate ini;
 extern crate openssl;
 extern crate protobuf;
-#[macro_use]
-extern crate error_chain;
-extern crate ini;
 extern crate sqlite;
 #[macro_use]
 extern crate clap;
@@ -23,14 +21,12 @@ use openssl::hash::{Hasher, MessageDigest};
 use openssl::symm;
 use std::convert::TryInto;
 use std::fs::File;
-use std::io::BufRead;
 use std::io::BufReader;
 use std::io::{Read, Write};
 use std::iter::Iterator;
 
 mod Backups;
-mod errors;
-use std::path::Path;
+mod args;
 
 struct CipherData {
 	hmac: crypto::hmac::Hmac<crypto::sha2::Sha256>,
@@ -42,7 +38,7 @@ fn read_frame<T: Read>(
 	r: &mut T,
 	cipher_data: &mut Option<CipherData>,
 	verify_mac: bool,
-) -> Result<(usize, Vec<u8>)> {
+) -> Result<(usize, Vec<u8>), anyhow::Error> {
 	let len = r.read_u32::<BigEndian>()?.try_into()?;
 	let mut frame_content = vec![0u8; len as usize];
 	r.read_exact(&mut frame_content)?;
@@ -70,7 +66,7 @@ fn read_frame<T: Read>(
 		}
 	}
 }
-fn decrypt(key: &[u8; 32], counter: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>> {
+fn decrypt(key: &[u8; 32], counter: &Vec<u8>, ciphertext: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
 	let mut decrypter = symm::Crypter::new(
 		symm::Cipher::aes_256_ctr(),
 		symm::Mode::Decrypt,
@@ -96,7 +92,7 @@ fn increase_counter(counter: &mut Vec<u8>, start: Option<usize>) {
 		}
 	}
 }
-fn generate_keys(key: &[u8], salt: &[u8]) -> Result<([u8; 32], [u8; 32])> {
+fn generate_keys(key: &[u8], salt: &[u8]) -> Result<([u8; 32], [u8; 32]), anyhow::Error> {
 	let mut digest = Hasher::new(MessageDigest::sha512())?;
 	digest.update(salt)?;
 	let mut hash = key.to_vec();
@@ -126,7 +122,7 @@ fn read_attachment<R: Read, W: Write>(
 	cipher_data: &mut CipherData,
 	length: usize,
 	verify_mac: bool,
-) -> Result<usize> {
+) -> Result<usize, anyhow::Error> {
 	let mut decrypter = symm::Crypter::new(
 		symm::Cipher::aes_256_ctr(),
 		symm::Mode::Decrypt,
@@ -171,16 +167,17 @@ fn read_attachment<R: Read, W: Write>(
 
 fn decode_backup<R: Read>(
 	mut reader: R,
-	password: &[u8],
-	attachment_folder: &Path,
-	avatar_folder: &Path,
-	sticker_folder: &Path,
-	config_folder: &Path,
+	config: &args::Config,
 	connection: &sqlite::Connection,
 	callback: fn(usize, usize, usize),
-	verify_mac: bool,
-) -> Result<usize> {
+) -> Result<usize, anyhow::Error> {
 	let mut cipher_data: Option<CipherData> = None;
+	let password = &config.password;
+	let attachment_folder = &config.path_output_attachment;
+	let avatar_folder = &config.path_output_avatar;
+	let sticker_folder = &config.path_output_sticker;
+	let config_folder = &config.path_output_config;
+	let verify_mac = config.no_verify_mac;
 
 	let mut frame_count = 0;
 	let mut attachment_count = 0;
@@ -392,139 +389,53 @@ fn frame_callback(frame_count: usize, attachment_count: usize, seek_position: us
 	std::io::stdout().flush().expect("Error flushing stdout");
 }
 
-fn get_directory(base: &Path, name: &str) -> std::path::PathBuf {
-	let folder = base.join(name);
-	if !folder.exists() {
-		std::fs::create_dir(&folder)
-			.unwrap_or_else(|_| panic!("{} could not be created", folder.to_string_lossy()));
-	} else if !folder.is_dir() {
-		panic!("{} exists and is not a directory", folder.to_string_lossy());
-	}
-	folder
-}
-
-fn run() -> Result<()> {
-	let matches = clap_app!(myapp =>
-		(name: crate_name!())
-        (version: crate_version!())
-        (author: crate_authors!())
-        (about: crate_description!())
-        (@group password =>
-        	(@attributes +required !multiple)
-	        (@arg password_string: -p --("password") [PASSWORD] "Backup password (30 digits, with or without spaces)")
-	        (@arg password_file: -f --("password_file") [FILE] "File to read the Backup password from")
-	    )
-	    (@group output_options =>
-        	(@attributes !required +multiple)
-	        (@arg output_path: -o --("output-path") [FOLDER] "Directory to save output to")
-	        (@arg sqlite_file: --("sqlite-path") +takes_value "File to store the sqlite database in [default: output_path/signal_backup.db]")
-	        (@arg attachment_path: --("attachment-path") default_value[attachments] "Directory to save attachments to")
-	        (@arg avatar_path: --("avatar-path") default_value[avatars] "Directory to save avatar images to")
-	        (@arg sticker_path: --("sticker-path") default_value[stickers] "Directory to save sticker images to")
-	        (@arg config_path: --("config-path") default_value[config] "Directory to save config files to")
-	    )
-	    (@arg no_tmp_sqlite: --("no-tmp-sqlite") "Do not use a temporary file for the sqlite database")
-	    (@arg no_verify_mac: --("no-verify-mac") "Do not verify the HMAC of each frame in the backup")
-	    (@arg INPUT: * "Sets the input file to use")
-    ).get_matches();
-
-	let input_file = Path::new(matches.value_of("INPUT").unwrap());
-
-	let output_path = Path::new(matches.value_of("output_path").unwrap_or_else(|| {
-		input_file
-			.file_stem()
-			.unwrap()
-			.to_str()
-			.expect("output_path not given and could not be automatically determined")
-	}));
-	if !output_path.exists() {
-		std::fs::create_dir(&output_path)
-			.unwrap_or_else(|_| panic!("{} could not be created", output_path.to_string_lossy()));
-	} else if !output_path.is_dir() {
-		panic!(
-			"{} exists and is not a directory",
-			output_path.to_string_lossy()
-		);
-	}
-
-	let attachment_folder =
-		get_directory(output_path, matches.value_of("attachment_path").unwrap());
-	let avatar_folder = get_directory(output_path, matches.value_of("avatar_path").unwrap());
-	let sticker_folder = get_directory(output_path, matches.value_of("sticker_path").unwrap());
-	let config_folder = get_directory(output_path, matches.value_of("config_path").unwrap());
-
-	let sqlite_path = match matches.value_of("sqlite_file") {
-		Some(s) => Path::new(&s).to_path_buf(),
-		None => output_path.join("signal_backup.db"),
-	};
-
-	let mut password = match matches.value_of("password_string") {
-		Some(p) => String::from(p),
-		None => {
-			let password_file = BufReader::new(
-				File::open(matches.value_of("password_file").unwrap())
-					.expect("Unable to open password file"),
-			);
-			password_file
-				.lines()
-				.next()
-				.expect("Password file is empty")
-				.expect("Unable to read from password file")
-		}
-	};
-
-	password.retain(|c| c >= '0' && c <= '9');
-
-	let password = password.as_bytes().to_vec();
-
-	let file = File::open(input_file).expect("Backup file could not be opened");
+fn run(config: &args::Config) -> Result<(), anyhow::Error> {
+	let file = File::open(&config.path_input).expect("Backup file could not be opened");
 	let mut reader = BufReader::new(file);
 
 	let mut tmpdir: Option<tempfile::TempDir> = None;
 
-	let connection = if matches.is_present("no_tmp_sqlite") {
-		sqlite::open(&sqlite_path)
-			.unwrap_or_else(|_| panic!("Could not open database file: {:?}", sqlite_path))
-	} else {
-		let t = tempfile::tempdir()
-			.expect("Failed to create tmpdir. Hint: Try running with --no-tmp-sqlite");
-		let sqlite_path = t.path().join("signal_backup.sqlite");
-		tmpdir = Some(t);
-		sqlite::open(&sqlite_path)
-			.unwrap_or_else(|_| panic!("Could not open database file: {:?}", sqlite_path))
+	let connection = match config.no_tmp_sqlite {
+		true => sqlite::open(&config.path_output_sqlite).expect(&format!(
+			"Could not open database file: {:?}",
+			config.path_output_sqlite
+		)),
+		false => {
+			let t = tempfile::tempdir()
+				.expect("Failed to create tmpdir. Hint: Try running with --no-tmp-sqlite");
+			let sqlite_path = t.path().join("signal_backup.sqlite");
+			tmpdir = Some(t);
+			let c = sqlite::open(&sqlite_path).expect(&format!(
+				"Could not open database file: {:?}",
+				config.path_output_sqlite
+			));
+			c
+		}
 	};
 
-	decode_backup(
-		&mut reader,
-		&password,
-		&attachment_folder,
-		&avatar_folder,
-		&sticker_folder,
-		&config_folder,
-		&connection,
-		frame_callback,
-		!matches.is_present("no_verify_mac"),
-	)
-	.unwrap();
+	decode_backup(&mut reader, config, &connection, frame_callback).unwrap();
 	if tmpdir.is_some() {
 		let t = tmpdir.unwrap();
 		let sqlite_tmp_path = t.path().join("signal_backup.sqlite");
-		match std::fs::rename(&sqlite_tmp_path, &sqlite_path) {
+		match std::fs::rename(&sqlite_tmp_path, &config.path_output_sqlite) {
 			Ok(_) => {
-				println!("Moved sqlite to {}", &sqlite_path.to_string_lossy());
+				println!(
+					"Moved sqlite to {}",
+					&config.path_output_sqlite.to_string_lossy()
+				);
 			}
 			Err(e) => {
 				println!(
 					"{}, Could not move {} to {}, trying copy",
 					e,
 					&sqlite_tmp_path.to_string_lossy(),
-					&sqlite_path.to_string_lossy()
+					&config.path_output_sqlite.to_string_lossy()
 				);
-				std::fs::copy(&sqlite_tmp_path, &sqlite_path)?;
+				std::fs::copy(&sqlite_tmp_path, &config.path_output_sqlite)?;
 				std::fs::remove_file(&sqlite_tmp_path)?;
 				println!(
 					"Copy successful, sqlite at {}",
-					&sqlite_path.to_string_lossy()
+					&config.path_output_sqlite.to_string_lossy()
 				);
 			}
 		}
@@ -536,11 +447,10 @@ fn run() -> Result<()> {
 
 fn main() {
 	// build config structure
-	//let args: Vec<String> = std::env::args().collect();
-	//let config = signal_backup_decode::args::Config::new(&args).unwrap_or_else(|e| {
-	//    eprintln!("Problem parsing arguments: {}.", e);
-	//    std::process::exit(1);
-	//});
+	let config = args::Config::new().unwrap_or_else(|e| {
+		eprintln!("Problem parsing arguments: {}.", e);
+		std::process::exit(1);
+	});
 
 	simplelog::TermLogger::init(
 		log::LevelFilter::Info,
@@ -552,7 +462,7 @@ fn main() {
 	// measuring runtime and run program
 	let now = std::time::Instant::now();
 
-	if let Err(e) = run() {
+	if let Err(e) = run(&config) {
 		error!("{}.", e);
 		std::process::exit(1);
 	}
