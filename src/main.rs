@@ -66,7 +66,7 @@ fn read_frame<T: Read>(
 		}
 	}
 }
-fn decrypt(key: &[u8; 32], counter: &Vec<u8>, ciphertext: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+fn decrypt(key: &[u8; 32], counter: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
 	let mut decrypter = symm::Crypter::new(
 		symm::Cipher::aes_256_ctr(),
 		symm::Mode::Decrypt,
@@ -395,27 +395,29 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 
 	let mut tmpdir: Option<tempfile::TempDir> = None;
 
-	let connection = match config.no_tmp_sqlite {
-		true => sqlite::open(&config.path_output_sqlite).expect(&format!(
-			"Could not open database file: {:?}",
-			config.path_output_sqlite
-		)),
-		false => {
-			let t = tempfile::tempdir()
-				.expect("Failed to create tmpdir. Hint: Try running with --no-tmp-sqlite");
-			let sqlite_path = t.path().join("signal_backup.sqlite");
-			tmpdir = Some(t);
-			let c = sqlite::open(&sqlite_path).expect(&format!(
+	let connection = if config.no_tmp_sqlite {
+		sqlite::open(&config.path_output_sqlite).unwrap_or_else(|_| {
+			panic!(
 				"Could not open database file: {:?}",
 				config.path_output_sqlite
-			));
-			c
-		}
+			)
+		})
+	} else {
+		let t = tempfile::tempdir()
+			.expect("Failed to create tmpdir. Hint: Try running with --no-tmp-sqlite");
+		let sqlite_path = t.path().join("signal_backup.sqlite");
+		tmpdir = Some(t);
+		sqlite::open(&sqlite_path).unwrap_or_else(|_| {
+			panic!(
+				"Could not open database file: {:?}",
+				config.path_output_sqlite
+			)
+		})
 	};
 
 	decode_backup(&mut reader, config, &connection, frame_callback).unwrap();
-	if tmpdir.is_some() {
-		let t = tmpdir.unwrap();
+
+	if let Some(t) = tmpdir {
 		let sqlite_tmp_path = t.path().join("signal_backup.sqlite");
 		match std::fs::rename(&sqlite_tmp_path, &config.path_output_sqlite) {
 			Ok(_) => {

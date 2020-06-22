@@ -51,20 +51,18 @@ impl Config {
 
 		let input_file = std::path::Path::new(matches.value_of("INPUT").unwrap());
 
-		let output_path = std::path::Path::new(
-			matches.value_of("output_path").unwrap_or(
+		let output_path =
+			std::path::Path::new(matches.value_of("output_path").unwrap_or_else(|| {
 				input_file
 					.file_stem()
 					.unwrap()
 					.to_str()
-					.expect("output_path not given and could not be automatically determined"),
-			),
-		);
+					.expect("output_path not given and could not be automatically determined")
+			}));
 		if !output_path.exists() {
-			std::fs::create_dir(&output_path).expect(&format!(
-				"{} could not be created",
-				output_path.to_string_lossy()
-			));
+			std::fs::create_dir(&output_path).unwrap_or_else(|_| {
+				panic!("{} could not be created", output_path.to_string_lossy())
+			});
 		} else if !output_path.is_dir() {
 			panic!(
 				"{} exists and is not a directory",
@@ -123,10 +121,8 @@ impl Config {
 	fn get_directory(base: &std::path::Path, name: &str) -> std::path::PathBuf {
 		let folder = base.join(name);
 		if !folder.exists() {
-			std::fs::create_dir(&folder).expect(&format!(
-				"{} could not be created",
-				folder.to_string_lossy()
-			));
+			std::fs::create_dir(&folder)
+				.unwrap_or_else(|_| panic!("{} could not be created", folder.to_string_lossy()));
 		} else if !folder.is_dir() {
 			panic!("{} exists and is not a directory", folder.to_string_lossy());
 		}
