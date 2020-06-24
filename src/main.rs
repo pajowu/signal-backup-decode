@@ -169,14 +169,11 @@ fn read_attachment<R: Read>(
 fn decode_backup<R: Read>(
     mut reader: R,
     config: &args::Config,
-    //connection: &sqlite::Connection,
     output: &mut output_raw::Output,
     callback: fn(usize, usize, usize),
 ) -> Result<usize, anyhow::Error> {
     let mut cipher_data: Option<CipherData> = None;
     let password = &config.password;
-    let avatar_folder = &config.path_output_avatar;
-    let config_folder = &config.path_output_config;
     let verify_mac = config.no_verify_mac;
 
     let mut frame_count = 0;
@@ -229,18 +226,11 @@ fn decode_backup<R: Read>(
             }
         } else if frame.has_avatar() {
             let a = frame.get_avatar();
-            let mut i = 0;
-            let mut path = avatar_folder.join(format!("{}_{}", a.get_name(), i));
-            if path.exists() {
-                i += 1;
-                path = avatar_folder.join(format!("{}_{}", a.get_name(), i));
-            }
-            let mut buffer = File::create(&path)
-                .unwrap_or_else(|_| panic!("Failed to open file: {}", path.to_string_lossy()));
             if let Some(ref mut c) = cipher_data {
                 let (data, read_bytes) =
                     read_attachment(&mut reader, c, a.get_length().try_into()?, verify_mac)?;
                 seek_position += read_bytes;
+                output.write_avatar(&data, a.get_name())?;
             } else {
                 panic!("Attachment/Avatar found before header, exiting");
             }
@@ -286,11 +276,7 @@ fn decode_backup<R: Read>(
             output.write_statement(frame.get_statement().get_statement(), params)?;
         } else if frame.has_preference() {
             let pref = frame.get_preference();
-            let config_file = config_folder.join(pref.get_file());
-            let mut conf = ini::Ini::load_from_file(&config_file).unwrap_or_default();
-            conf.with_section(None::<String>)
-                .set(pref.get_key(), pref.get_value());
-            conf.write_to_file(&config_file)?;
+            output.write_preference(pref)?;
         } else if frame.has_end() {
             break;
         } else {
@@ -323,55 +309,8 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
     // output
     let mut output = output_raw::Output::new(&config.path_output_main, true)?;
 
-    //let connection = if config.no_tmp_sqlite {
-    //    sqlite::open(&config.path_output_sqlite).unwrap_or_else(|_| {
-    //        panic!(
-    //            "Could not open database file: {:?}",
-    //            config.path_output_sqlite
-    //        )
-    //    })
-    //} else {
-    //    let t = tempfile::tempdir()
-    //        .expect("Failed to create tmpdir. Hint: Try running with --no-tmp-sqlite");
-    //    let sqlite_path = t.path().join("signal_backup.sqlite");
-    //    tmpdir = Some(t);
-    //    sqlite::open(&sqlite_path).unwrap_or_else(|_| {
-    //        panic!(
-    //            "Could not open database file: {:?}",
-    //            config.path_output_sqlite
-    //        )
-    //    })
-    //};
-
-    //decode_backup(&mut reader, config, &connection, frame_callback).unwrap();
     decode_backup(&mut reader, config, &mut output, frame_callback)?;
 
-    //if let Some(t) = tmpdir {
-    //    let sqlite_tmp_path = t.path().join("signal_backup.sqlite");
-    //    match std::fs::rename(&sqlite_tmp_path, &config.path_output_sqlite) {
-    //        Ok(_) => {
-    //            println!(
-    //                "Moved sqlite to {}",
-    //                &config.path_output_sqlite.to_string_lossy()
-    //            );
-    //        }
-    //        Err(e) => {
-    //            println!(
-    //                "{}, Could not move {} to {}, trying copy",
-    //                e,
-    //                &sqlite_tmp_path.to_string_lossy(),
-    //                &config.path_output_sqlite.to_string_lossy()
-    //            );
-    //            std::fs::copy(&sqlite_tmp_path, &config.path_output_sqlite)?;
-    //            std::fs::remove_file(&sqlite_tmp_path)?;
-    //            println!(
-    //                "Copy successful, sqlite at {}",
-    //                &config.path_output_sqlite.to_string_lossy()
-    //            );
-    //        }
-    //    }
-    //    t.close().unwrap();
-    //}
     println!();
     Ok(())
 }

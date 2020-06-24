@@ -14,6 +14,7 @@ pub struct Output {
     sqlite_connection: rusqlite::Connection,
     count_attachment: usize,
     count_sticker: usize,
+    count_avatar: usize,
 }
 
 impl Output {
@@ -68,6 +69,7 @@ impl Output {
             })?,
             count_attachment: 0,
             count_sticker: 0,
+            count_avatar: 0,
         })
     }
 
@@ -139,9 +141,49 @@ impl Output {
         Ok(())
     }
 
-    pub fn write_avatar() {}
+    pub fn write_avatar(&mut self, data: &[u8], name: &str) -> Result<(), anyhow::Error> {
+        //let mut path = self.path_sticker.join(format!("{}_{}", row_id, 1));
+        //if path.exists() {
+        //    path = self.path_sticker.join(format!("{}_{}", row_id, 2));
+        //}
 
-    pub fn write_preference() {}
+        let path = self
+            .path_avatar
+            .join(format!("{}_{}", name, self.count_avatar));
+        let mut buffer = std::fs::File::create(&path).with_context(|| {
+            format!("Failed to open attachment file: {}", path.to_string_lossy())
+        })?;
+
+        buffer.write_all(data).with_context(|| {
+            format!(
+                "Failed to write to attachment file: {}",
+                path.to_string_lossy()
+            )
+        })?;
+
+        self.count_attachment += 1;
+        self.count_avatar += 1;
+
+        Ok(())
+    }
+
+    pub fn write_preference(
+        &self,
+        pref: &super::Backups::SharedPreference,
+    ) -> Result<(), anyhow::Error> {
+        let path = self.path_config.join(pref.get_file());
+        let mut conf = ini::Ini::load_from_file(&path).unwrap_or_default();
+        conf.with_section(None::<String>)
+            .set(pref.get_key(), pref.get_value());
+        conf.write_to_file(&path).with_context(|| {
+            format!(
+                "Could not write to preference file: {}",
+                path.to_string_lossy()
+            )
+        })?;
+
+        Ok(())
+    }
 
     pub fn get_attachment_count(&self) -> usize {
         self.count_attachment
