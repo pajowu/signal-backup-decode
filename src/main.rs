@@ -23,10 +23,10 @@ use std::convert::TryInto;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::{Read, Write};
-use std::iter::Iterator;
 
 mod Backups;
 mod args;
+mod frame;
 mod output_raw;
 
 struct CipherData {
@@ -187,103 +187,85 @@ fn decode_backup<R: Read>(
         seek_position += consumed_bytes;
         let frame = protobuf::parse_from_bytes::<Backups::BackupFrame>(&frame_content)
             .unwrap_or_else(|_| panic!("Could not parse frame from {:?}", frame_content));
+        let frame = frame::Frame::new(&frame);
 
-        let frame_fields = [
-            frame.has_header(),
-            frame.has_statement(),
-            frame.has_preference(),
-            frame.has_attachment(),
-            frame.has_version(),
-            frame.has_end(),
-            frame.has_avatar(),
-            frame.has_sticker(),
-        ];
-        if frame_fields.iter().filter(|x| **x).count() != 1 {
-            panic!(
-                "Frame with an unsupported number of fields found, please report to author: {:?}",
-                frame
-            );
-        }
-        if frame.has_header() {
-            let (cipher_key, mac_key) = generate_keys(&password, frame.get_header().get_salt())
-                .expect("Error generating keys");
-            cipher_data = Some(CipherData {
-                hmac: crypto::hmac::Hmac::new(crypto::sha2::Sha256::new(), &mac_key),
-                cipher_key,
-                counter: frame.get_header().get_iv().to_vec(),
-            })
-        } else if cipher_data.is_none() {
-            panic!("Read non-header frame before header frame");
-        } else if frame.has_version() {
-            println!("Database Version: {:?}", frame.get_version().get_version());
-        } else if frame.has_attachment() {
-            let a = frame.get_attachment();
-            if let Some(ref mut c) = cipher_data {
-                let (data, read_bytes) =
-                    read_attachment(&mut reader, c, a.get_length().try_into()?, verify_mac)?;
-                seek_position += read_bytes;
-                output.write_attachment(&data, a.get_attachmentId(), a.get_rowId())?;
-            } else {
-                panic!("Attachment found before header, exiting");
+        match frame {
+            frame::Frame::Header { salt, iv } => {
+                let (cipher_key, mac_key) =
+                    generate_keys(&password, salt).expect("Error generating keys");
+                cipher_data = Some(CipherData {
+                    hmac: crypto::hmac::Hmac::new(crypto::sha2::Sha256::new(), &mac_key),
+                    cipher_key,
+                    counter: iv.to_vec(),
+                })
             }
-        } else if frame.has_avatar() {
-            let a = frame.get_avatar();
-            if let Some(ref mut c) = cipher_data {
-                let (data, read_bytes) =
-                    read_attachment(&mut reader, c, a.get_length().try_into()?, verify_mac)?;
-                seek_position += read_bytes;
-                output.write_avatar(&data, a.get_name())?;
-            } else {
-                panic!("Attachment/Avatar found before header, exiting");
+            frame::Frame::Version { version } => {
+                println!("Database Version: {:?}", version);
             }
-        } else if frame.has_sticker() {
-            let a = frame.get_sticker();
-            if let Some(ref mut c) = cipher_data {
-                let (data, read_bytes) =
-                    read_attachment(&mut reader, c, a.get_length().try_into()?, verify_mac)?;
-                seek_position += read_bytes;
-                output.write_sticker(&data, a.get_rowId())?;
-            } else {
-                panic!("Attachment/Sticker found before header, exiting");
-            }
-        } else if frame.has_statement() {
-            let statement = frame.get_statement().get_statement();
-            // In database version 9 signal added full text search and uses TRIGGERs to create the virtual tables. however this breaks when importing the data.
-            if statement.starts_with("CREATE TRIGGER")
-                || statement.contains("_fts")
-                || statement.starts_with("CREATE TABLE sqlite_")
-            {
-                continue;
-            }
-
-            let mut params: Vec<crate::rusqlite::types::ToSqlOutput> = std::vec::Vec::new();
-
-            for param in frame.get_statement().get_parameters().iter() {
-                if param.has_stringParamter() {
-                    params.push(param.get_stringParamter().into());
-                } else if param.has_integerParameter() {
-                    params.push((param.get_integerParameter() as i64).into());
-                } else if param.has_doubleParameter() {
-                    params.push(param.get_doubleParameter().into());
-                } else if param.has_blobParameter() {
-                    params.push(param.get_blobParameter().into());
-                } else if param.has_nullparameter() {
-                    params.push(rusqlite::types::Null.into());
+            frame::Frame::Attachment { attachment } => {
+                if let Some(ref mut c) = cipher_data {
+                    let (data, read_bytes) = read_attachment(
+                        &mut reader,
+                        c,
+                        attachment.get_length().try_into()?,
+                        verify_mac,
+                    )?;
+                    seek_position += read_bytes;
+                    output.write_attachment(
+                        &data,
+                        attachment.get_attachmentId(),
+                        attachment.get_rowId(),
+                    )?;
                 } else {
-                    panic!("Parameter type not known {:?}", param);
+                    panic!("Attachment found before header, exiting");
                 }
             }
+            frame::Frame::Avatar { avatar } => {
+                if let Some(ref mut c) = cipher_data {
+                    let (data, read_bytes) = read_attachment(
+                        &mut reader,
+                        c,
+                        avatar.get_length().try_into()?,
+                        verify_mac,
+                    )?;
+                    seek_position += read_bytes;
+                    output.write_avatar(&data, avatar.get_name())?;
+                } else {
+                    panic!("Attachment/Avatar found before header, exiting");
+                }
+            }
+            frame::Frame::Sticker { sticker } => {
+                if let Some(ref mut c) = cipher_data {
+                    let (data, read_bytes) = read_attachment(
+                        &mut reader,
+                        c,
+                        sticker.get_length().try_into()?,
+                        verify_mac,
+                    )?;
+                    seek_position += read_bytes;
+                    output.write_sticker(&data, sticker.get_rowId())?;
+                } else {
+                    panic!("Attachment/Sticker found before header, exiting");
+                }
+            }
+            frame::Frame::Statement {
+                statement,
+                parameter,
+            } => {
+                output.write_statement(statement, parameter)?;
+            }
+            frame::Frame::Preference { preference } => {
+                output.write_preference(preference)?;
+            }
+            frame::Frame::End => {
+                break;
+            }
+        };
 
-            // write to new output object
-            output.write_statement(frame.get_statement().get_statement(), params)?;
-        } else if frame.has_preference() {
-            let pref = frame.get_preference();
-            output.write_preference(pref)?;
-        } else if frame.has_end() {
-            break;
-        } else {
-            panic!("Unsupported Frame: {:?}", frame);
-        }
+        // TODO this has to checked elsewhere
+        //else if cipher_data.is_none() {
+        //    panic!("Read non-header frame before header frame");
+        //}
         frame_count += 1;
         callback(frame_count, output.get_attachment_count(), seek_position);
     }

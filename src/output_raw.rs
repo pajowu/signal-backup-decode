@@ -78,6 +78,14 @@ impl Output {
         statement: &str,
         parameters: Vec<crate::rusqlite::types::ToSqlOutput>,
     ) -> Result<(), anyhow::Error> {
+        // In database version 9 signal added full text search and uses TRIGGERs to create the virtual tables. however this breaks when importing the data.
+        if statement.starts_with("CREATE TRIGGER")
+            || statement.contains("_fts")
+            || statement.starts_with("CREATE TABLE sqlite_")
+        {
+            return Ok(());
+        }
+
         self.sqlite_connection
             .execute(statement, parameters)
             .with_context(|| {
