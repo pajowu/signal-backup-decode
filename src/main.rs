@@ -162,6 +162,8 @@ fn decode_backup<R: Read>(
     output: &mut output_raw::Output,
     callback: fn(usize, usize, usize),
 ) -> Result<usize, anyhow::Error> {
+    let mut decrypter: Option<decrypter::Decrypter> = None;
+
     let mut cipher_data: Option<CipherData> = None;
     let verify_mac = config.no_verify_mac;
 
@@ -180,6 +182,7 @@ fn decode_backup<R: Read>(
             frame::Frame::Header { salt, iv } => {
                 let (cipher_key, mac_key) =
                     generate_keys(&config.password, salt).expect("Error generating keys");
+                decrypter = Some(decrypter::Decrypter::new(&config.password, salt));
                 cipher_data = Some(CipherData {
                     hmac: crypto::hmac::Hmac::new(crypto::sha2::Sha256::new(), &mac_key),
                     cipher_key,
