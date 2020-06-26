@@ -28,10 +28,17 @@ fn read_frame<T: Read>(
     r: &mut T,
     cipher_data: &mut Option<CipherData>,
     verify_mac: bool,
+    decrypter: &mut Option<decrypter::Decrypter>,
 ) -> Result<(usize, Vec<u8>), anyhow::Error> {
     let len = r.read_u32::<BigEndian>()?.try_into()?;
     let mut frame_content = vec![0u8; len as usize];
     r.read_exact(&mut frame_content)?;
+
+    if let Some(decrypter) = decrypter {
+        let mut test = frame_content.clone();
+        decrypter.decrypt(&mut test);
+    }
+
     match *cipher_data {
         None => Ok((len, frame_content)),
         Some(ref mut cipher_data) => {
@@ -172,7 +179,7 @@ fn decode_backup<R: Read>(
 
     loop {
         let (consumed_bytes, frame_content) =
-            read_frame(&mut reader, &mut cipher_data, verify_mac)?;
+            read_frame(&mut reader, &mut cipher_data, verify_mac, &mut decrypter)?;
         seek_position += consumed_bytes;
         let frame = protobuf::parse_from_bytes::<Backups::BackupFrame>(&frame_content)
             .unwrap_or_else(|_| panic!("Could not parse frame from {:?}", frame_content));
@@ -182,7 +189,12 @@ fn decode_backup<R: Read>(
             frame::Frame::Header { salt, iv } => {
                 let (cipher_key, mac_key) =
                     generate_keys(&config.password, salt).expect("Error generating keys");
-                decrypter = Some(decrypter::Decrypter::new(&config.password, salt, iv));
+                decrypter = Some(decrypter::Decrypter::new(
+                    &config.password,
+                    salt,
+                    iv,
+                    config.no_verify_mac,
+                ));
                 cipher_data = Some(CipherData {
                     hmac: crypto::hmac::Hmac::new(crypto::sha2::Sha256::new(), &mac_key),
                     cipher_key,
