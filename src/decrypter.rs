@@ -7,28 +7,28 @@ pub struct Decrypter {
 }
 
 impl Decrypter {
-    pub fn new(key: &[u8], salt: &[u8]) -> Result<Self, anyhow::Error> {
+    pub fn new(key: &[u8], salt: &[u8]) -> Self {
         // create hash
         let mut hash = key.to_vec();
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(salt);
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(&salt);
 
         for _ in 0..250000 {
             hasher.update(&hash);
-            hasher.update(&key);
+            hasher.update(key);
             hash = hasher.finalize_reset().to_vec();
         }
 
         // create secrets
-        let info = hex::decode("Backup Export").unwrap();
-        let mut sec = [0u8; 64];
-        let hk = hkdf::Hkdf::<sha2::Sha256>::new(Some(&hash[..32]), key);
-        hk.expand(&info, &mut sec).unwrap();
+        let info = b"Backup Export";
+        let mut okm = [0u8; 64];
+        let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, &hash[..32]);
+        hk.expand(info, &mut okm).unwrap();
 
-        Ok(Self {
-            cipher_key: sec[..32].to_vec(),
-            mac_key: sec[32..].to_vec(),
-        })
+        Self {
+            cipher_key: okm[..32].to_vec(),
+            mac_key: okm[32..].to_vec(),
+        }
 
         //fn generate_keys(key: &[u8], salt: &[u8]) -> Result<([u8; 32], [u8; 32]), anyhow::Error> {
         //    let mut digest = Hasher::new(MessageDigest::sha512())?;
