@@ -6,28 +6,28 @@ pub enum Frame<'a> {
     },
     Statement {
         statement: &'a str,
-        parameter: Vec<crate::rusqlite::types::ToSqlOutput<'a>>,
+        parameter: Vec<rusqlite::types::ToSqlOutput<'a>>,
     },
     Preference {
-        preference: &'a super::Backups::SharedPreference,
+        preference: &'a crate::Backups::SharedPreference,
     },
     Attachment {
-        attachment: &'a super::Backups::Attachment,
+        attachment: &'a crate::Backups::Attachment,
     },
     Version {
         version: u32,
     },
     End,
     Avatar {
-        avatar: &'a super::Backups::Avatar,
+        avatar: &'a crate::Backups::Avatar,
     },
     Sticker {
-        sticker: &'a super::Backups::Sticker,
+        sticker: &'a crate::Backups::Sticker,
     },
 }
 
 impl<'a> Frame<'a> {
-    pub fn new(frame: &'a super::Backups::BackupFrame) -> Self {
+    pub fn new(frame: &'a crate::Backups::BackupFrame) -> Self {
         let mut fields_count = 0;
         let mut ret: Option<Self> = None;
 
@@ -44,7 +44,7 @@ impl<'a> Frame<'a> {
             ret = Some(Self::Statement {
                 statement: frame.get_statement().get_statement(),
                 parameter: {
-                    let mut params: Vec<crate::rusqlite::types::ToSqlOutput<'a>> = Vec::new();
+                    let mut params: Vec<rusqlite::types::ToSqlOutput<'a>> = Vec::new();
                     for param in frame.get_statement().get_parameters().iter() {
                         if param.has_stringParamter() {
                             params.push(param.get_stringParamter().into());

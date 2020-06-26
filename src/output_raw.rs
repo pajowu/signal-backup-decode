@@ -76,7 +76,7 @@ impl Output {
     pub fn write_statement(
         &self,
         statement: &str,
-        parameters: Vec<crate::rusqlite::types::ToSqlOutput>,
+        parameters: Vec<rusqlite::types::ToSqlOutput>,
     ) -> Result<(), anyhow::Error> {
         // In database version 9 signal added full text search and uses TRIGGERs to create the virtual tables. however this breaks when importing the data.
         if statement.starts_with("CREATE TRIGGER")
@@ -177,7 +177,7 @@ impl Output {
 
     pub fn write_preference(
         &self,
-        pref: &super::Backups::SharedPreference,
+        pref: &crate::Backups::SharedPreference,
     ) -> Result<(), anyhow::Error> {
         let path = self.path_config.join(pref.get_file());
         let mut conf = ini::Ini::load_from_file(&path).unwrap_or_default();

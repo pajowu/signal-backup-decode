@@ -15,15 +15,14 @@ hex = "^0.3"
 protobuf = "^2.14"
 byteorder = "^1"
 rust-crypto = "^0.2"
-error-chain = "^0.12"
-#sqlite = "^0.25"
 rust-ini = "^0.15"
 clap = "^2.33"
-tempfile = "^3"
 simplelog = "^0.8"
 anyhow = "^1.0"
 log = "^0.4"
 rusqlite = "^0.23"
+hkdf = "^0.9"
+sha2 = "^0.9"
 
 [build-dependencies]
 protoc-rust = {version = "^2.14", optional = true}
