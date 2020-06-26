@@ -182,7 +182,7 @@ fn decode_backup<R: Read>(
             frame::Frame::Header { salt, iv } => {
                 let (cipher_key, mac_key) =
                     generate_keys(&config.password, salt).expect("Error generating keys");
-                decrypter = Some(decrypter::Decrypter::new(&config.password, salt));
+                decrypter = Some(decrypter::Decrypter::new(&config.password, salt, iv));
                 cipher_data = Some(CipherData {
                     hmac: crypto::hmac::Hmac::new(crypto::sha2::Sha256::new(), &mac_key),
                     cipher_key,
