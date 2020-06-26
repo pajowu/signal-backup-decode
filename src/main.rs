@@ -35,32 +35,10 @@ fn read_frame<T: Read>(
     r.read_exact(&mut frame_content)?;
 
     if let Some(decrypter) = decrypter {
-        let mut test = frame_content.clone();
-        decrypter.decrypt(&mut test);
-    }
-
-    match *cipher_data {
-        None => Ok((len, frame_content)),
-        Some(ref mut cipher_data) => {
-            let frame_data = &frame_content[..frame_content.len() - 10];
-            if verify_mac {
-                let frame_mac = &frame_content[frame_content.len() - 10..];
-                cipher_data.hmac.input(&frame_data);
-                let hmac_result = cipher_data.hmac.result();
-                let calculated_mac = &hmac_result.code()[..10];
-                cipher_data.hmac.reset();
-                if !crypto::util::fixed_time_eq(calculated_mac, frame_mac) {
-                    return Err(anyhow!(
-                        "MacVerificationError, {:?}, {:?}.",
-                        calculated_mac.to_vec(),
-                        frame_mac.to_vec(),
-                    ));
-                }
-            }
-            let plaintext = decrypt(&cipher_data.cipher_key, &cipher_data.counter, frame_data)?;
-            increase_counter(&mut cipher_data.counter, None);
-            Ok((len, plaintext))
-        }
+        decrypter.decrypt(&mut frame_content)?;
+        Ok((len, frame_content))
+    } else {
+        Ok((len, frame_content))
     }
 }
 fn decrypt(key: &[u8; 32], counter: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
