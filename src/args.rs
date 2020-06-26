@@ -1,5 +1,6 @@
 // imports
 use anyhow::{anyhow, Context};
+use clap::{clap_app, crate_authors, crate_description, crate_name, crate_version};
 use std::io::BufRead;
 
 /// Config struct

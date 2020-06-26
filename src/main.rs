@@ -1,15 +1,3 @@
-extern crate crypto;
-extern crate hex;
-extern crate ini;
-extern crate openssl;
-extern crate protobuf;
-#[macro_use]
-extern crate clap;
-extern crate anyhow;
-extern crate log;
-extern crate rusqlite;
-extern crate tempfile;
-
 use anyhow::anyhow;
 use byteorder::BigEndian;
 use byteorder::ReadBytesExt;
@@ -25,7 +13,9 @@ use std::io::{Read, Write};
 
 mod Backups;
 mod args;
+mod decrypter;
 mod frame;
+mod input;
 mod output_raw;
 
 struct CipherData {
@@ -173,7 +163,6 @@ fn decode_backup<R: Read>(
     callback: fn(usize, usize, usize),
 ) -> Result<usize, anyhow::Error> {
     let mut cipher_data: Option<CipherData> = None;
-    let password = &config.password;
     let verify_mac = config.no_verify_mac;
 
     let mut frame_count = 0;
@@ -190,7 +179,7 @@ fn decode_backup<R: Read>(
         match frame {
             frame::Frame::Header { salt, iv } => {
                 let (cipher_key, mac_key) =
-                    generate_keys(&password, salt).expect("Error generating keys");
+                    generate_keys(&config.password, salt).expect("Error generating keys");
                 cipher_data = Some(CipherData {
                     hmac: crypto::hmac::Hmac::new(crypto::sha2::Sha256::new(), &mac_key),
                     cipher_key,
