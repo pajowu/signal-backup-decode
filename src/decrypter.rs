@@ -1,13 +1,15 @@
+use aes_ctr::stream_cipher::NewStreamCipher;
+use hmac::crypto_mac::NewMac;
 use sha2::Digest;
 
 /// Decrypt bytes
 pub struct Decrypter {
-    cipher_key: Vec<u8>,
-    mac_key: Vec<u8>,
+    mac: hmac::Hmac<sha2::Sha256>,
+    cipher: aes_ctr::Aes256Ctr,
 }
 
 impl Decrypter {
-    pub fn new(key: &[u8], salt: &[u8]) -> Self {
+    pub fn new(key: &[u8], salt: &[u8], iv: &[u8]) -> Self {
         // create hash
         let mut hash = key.to_vec();
         let mut hasher = sha2::Sha512::new();
@@ -25,33 +27,18 @@ impl Decrypter {
         let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, &hash[..32]);
         hk.expand(info, &mut okm).unwrap();
 
-        Self {
-            cipher_key: okm[..32].to_vec(),
-            mac_key: okm[32..].to_vec(),
-        }
+        //Self {
+        //    cipher_key: okm[..32].to_vec(),
+        //    mac_key: okm[32..].to_vec(),
+        //}
 
-        //fn generate_keys(key: &[u8], salt: &[u8]) -> Result<([u8; 32], [u8; 32]), anyhow::Error> {
-        //    let mut digest = Hasher::new(MessageDigest::sha512())?;
-        //    digest.update(salt)?;
-        //    let mut hash = key.to_vec();
-        //    for _ in 0..250000 {
-        //        digest.update(&hash)?;
-        //        digest.update(key)?;
-        //        hash = digest.finish()?.to_vec();
-        //    }
-        //    let backup_key = &hash[..32];
-        //    Ok(derive_secrets(backup_key, b"Backup Export", 64))
-        //}
-        //fn derive_secrets(key: &[u8], info: &[u8], length: usize) -> ([u8; 32], [u8; 32]) {
-        //    let mut prk = [0u8; 32];
-        //    crypto::hkdf::hkdf_extract(crypto::sha2::Sha256::new(), &[0u8; 32], key, &mut prk);
-        //    let mut sec = vec![0u8; length];
-        //    crypto::hkdf::hkdf_expand(crypto::sha2::Sha256::new(), &prk, info, &mut sec);
-        //    let mut sec1: [u8; 32] = Default::default();
-        //    let mut sec2: [u8; 32] = Default::default();
-        //    sec1.copy_from_slice(&sec[..32]);
-        //    sec2.copy_from_slice(&sec[32..]);
-        //    (sec1, sec2)
-        //}
+        // create hmac and cipher
+        Self {
+            mac: hmac::Hmac::<sha2::Sha256>::new_varkey(&okm[32..]).unwrap(),
+            cipher: aes_ctr::Aes256Ctr::new(
+                generic_array::GenericArray::from_slice(&okm[..32]),
+                generic_array::GenericArray::from_slice(&iv),
+            ),
+        }
     }
 }
