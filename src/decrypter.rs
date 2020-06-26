@@ -1,5 +1,6 @@
 use aes_ctr::stream_cipher::NewStreamCipher;
 use aes_ctr::stream_cipher::SyncStreamCipher;
+use anyhow::anyhow;
 use hmac::crypto_mac::Mac;
 use hmac::crypto_mac::NewMac;
 use sha2::Digest;
@@ -48,7 +49,7 @@ impl Decrypter {
         }
     }
 
-    pub fn decrypt(&mut self, data: &mut [u8]) {
+    pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), anyhow::Error> {
         // frame data: data[..data.len() - 10];
         // hmac data: data[data.len() - 10..];
         let data_length = data.len() - 10;
@@ -64,7 +65,7 @@ impl Decrypter {
             let result = code_bytes.ct_eq(&data[data_length..]);
 
             if result.unwrap_u8() == 0 {
-                panic!("Wrong HMAC!")
+                return Err(anyhow!("HMAC verification failed"));
             }
         }
 
@@ -78,6 +79,8 @@ impl Decrypter {
             generic_array::GenericArray::from_slice(&self.key),
             generic_array::GenericArray::from_slice(&self.iv),
         );
+
+        Ok(())
     }
 
     // what is happening here?
