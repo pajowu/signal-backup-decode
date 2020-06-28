@@ -49,42 +49,41 @@ impl Decrypter {
         }
     }
 
-    pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), anyhow::Error> {
-        // frame data: data[..data.len() - 10];
-        // hmac data: data[data.len() - 10..];
-        let data_length = data.len() - 10;
-
+    pub fn decrypt(&mut self, mut data_decrypt: &mut [u8]) {
         // check hmac?
         if let Some(ref mut hmac) = self.mac {
             // calculate hmac of frame data
-            hmac.update(&data[..data_length]);
+            hmac.update(&data_decrypt);
+        }
+
+        // decrypt
+        self.cipher.apply_keystream(&mut data_decrypt);
+    }
+
+    pub fn mac_update_with_iv(&mut self) {
+        if let Some(ref mut hmac) = self.mac {
+            hmac.update(&self.iv);
+        }
+    }
+
+    pub fn verify_mac(&mut self, hmac_control: &[u8]) -> Result<(), anyhow::Error> {
+        if let Some(ref mut hmac) = self.mac {
             let result = hmac.finalize_reset();
             let code_bytes = &result.into_bytes()[..10];
 
             // compare to given hmac
-            let result = code_bytes.ct_eq(&data[data_length..]);
+            let result = code_bytes.ct_eq(&hmac_control);
 
             if result.unwrap_u8() == 0 {
                 return Err(anyhow!("HMAC verification failed"));
             }
         }
 
-        // decrypt
-        self.cipher.apply_keystream(&mut data[..data_length]);
-
-        // prepare for next round
-        self.increase_iv();
-        // TODO overhead
-        self.cipher = aes_ctr::Aes256Ctr::new(
-            generic_array::GenericArray::from_slice(&self.key),
-            generic_array::GenericArray::from_slice(&self.iv),
-        );
-
         Ok(())
     }
 
-    // what is happening here?
-    fn increase_iv(&mut self) {
+    // TODO what is happening here?
+    pub fn increase_iv(&mut self) {
         let mut i = 3;
 
         loop {
@@ -96,5 +95,10 @@ impl Decrypter {
                 i -= 1;
             }
         }
+
+        self.cipher = aes_ctr::Aes256Ctr::new(
+            generic_array::GenericArray::from_slice(&self.key),
+            generic_array::GenericArray::from_slice(&self.iv),
+        );
     }
 }
