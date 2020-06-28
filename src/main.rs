@@ -1,11 +1,7 @@
-use anyhow::anyhow;
 use byteorder::BigEndian;
 use byteorder::ReadBytesExt;
-use crypto::mac::Mac;
 use log::error;
 use log::info;
-use openssl::hash::{Hasher, MessageDigest};
-use openssl::symm;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::BufReader;
@@ -18,127 +14,58 @@ mod frame;
 mod input;
 mod output_raw;
 
-struct CipherData {
-    hmac: crypto::hmac::Hmac<crypto::sha2::Sha256>,
-    cipher_key: [u8; 32],
-    counter: Vec<u8>,
-}
-
 fn read_frame<T: Read>(
     r: &mut T,
-    cipher_data: &mut Option<CipherData>,
-    verify_mac: bool,
     decrypter: &mut Option<decrypter::Decrypter>,
 ) -> Result<(usize, Vec<u8>), anyhow::Error> {
     let len = r.read_u32::<BigEndian>()?.try_into()?;
-    let mut frame_content = vec![0u8; len as usize];
-    r.read_exact(&mut frame_content)?;
 
     if let Some(decrypter) = decrypter {
-        decrypter.decrypt(&mut frame_content)?;
-        Ok((len, frame_content))
+        let mut frame_content = vec![0u8; len as usize - 10];
+        let mut frame_hmac = vec![0u8; 10];
+        r.read_exact(&mut frame_content)?;
+        r.read_exact(&mut frame_hmac)?;
+        decrypter.decrypt(&mut frame_content);
+        decrypter.verify_mac(&frame_hmac)?;
+        decrypter.increase_iv();
+        Ok((len, frame_content.to_vec()))
     } else {
+        let mut frame_content = vec![0u8; len as usize];
+        r.read_exact(&mut frame_content)?;
         Ok((len, frame_content))
     }
-}
-fn decrypt(key: &[u8; 32], counter: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    let mut decrypter = symm::Crypter::new(
-        symm::Cipher::aes_256_ctr(),
-        symm::Mode::Decrypt,
-        key,
-        Some(&counter),
-    )?;
-    let block_size = symm::Cipher::aes_256_ctr().block_size();
-    let mut plaintext = vec![0; ciphertext.len() + block_size];
-    let mut count = decrypter.update(&ciphertext, &mut plaintext)?;
-    count += decrypter.finalize(&mut plaintext[count..])?;
-    plaintext.truncate(count);
-    Ok(plaintext)
-}
-fn increase_counter(counter: &mut Vec<u8>, start: Option<usize>) {
-    let mut i = start.unwrap_or(3);
-    loop {
-        if counter[i] < 255 {
-            counter[i] += 1;
-            break;
-        } else {
-            counter[i] = 0;
-            i -= 1
-        }
-    }
-}
-fn generate_keys(key: &[u8], salt: &[u8]) -> Result<([u8; 32], [u8; 32]), anyhow::Error> {
-    let mut digest = Hasher::new(MessageDigest::sha512())?;
-    digest.update(salt)?;
-    let mut hash = key.to_vec();
-    for _ in 0..250000 {
-        digest.update(&hash)?;
-        digest.update(key)?;
-        hash = digest.finish()?.to_vec();
-    }
-    let backup_key = &hash[..32];
-    Ok(derive_secrets(backup_key, b"Backup Export", 64))
-}
-fn derive_secrets(key: &[u8], info: &[u8], length: usize) -> ([u8; 32], [u8; 32]) {
-    let mut prk = [0u8; 32];
-    crypto::hkdf::hkdf_extract(crypto::sha2::Sha256::new(), &[0u8; 32], key, &mut prk);
-    let mut sec = vec![0u8; length];
-    crypto::hkdf::hkdf_expand(crypto::sha2::Sha256::new(), &prk, info, &mut sec);
-    let mut sec1: [u8; 32] = Default::default();
-    let mut sec2: [u8; 32] = Default::default();
-    sec1.copy_from_slice(&sec[..32]);
-    sec2.copy_from_slice(&sec[32..]);
-    (sec1, sec2)
 }
 
 fn read_attachment<R: Read>(
     reader: &mut R,
-    cipher_data: &mut CipherData,
     length: usize,
-    verify_mac: bool,
+    decrypter: &mut Option<decrypter::Decrypter>,
 ) -> Result<(std::vec::Vec<u8>, usize), anyhow::Error> {
-    let mut decrypter = symm::Crypter::new(
-        symm::Cipher::aes_256_ctr(),
-        symm::Mode::Decrypt,
-        &cipher_data.cipher_key,
-        Some(&&cipher_data.counter),
-    )?;
-    let block_size = symm::Cipher::aes_256_ctr().block_size();
-    let mut plaintext: std::vec::Vec<u8> = vec![0; 8192 + block_size];
-    let mut plaintext_total: std::vec::Vec<u8> = std::vec::Vec::new();
-
-    cipher_data.hmac.input(&cipher_data.counter);
-
     let mut bytes_left = length as usize;
+    let mut attachment_data = Vec::new();
+    let mut attachment_hmac = [0u8; 10];
+
+    if let Some(decrypter) = decrypter {
+        decrypter.mac_update_with_iv();
+    }
+
     while bytes_left > 0 {
         let mut buffer = vec![0u8; std::cmp::min(bytes_left, 8192)];
         reader.read_exact(&mut buffer)?;
         bytes_left -= buffer.len();
-        if verify_mac {
-            cipher_data.hmac.input(&buffer);
+        if let Some(decrypter) = decrypter {
+            decrypter.decrypt(&mut buffer);
         }
-        let mut count = decrypter.update(&buffer, &mut plaintext)?;
-        count += decrypter.finalize(&mut plaintext[count..])?;
-        // writer.write_all(&plaintext[..count])?;
-        plaintext_total.extend_from_slice(&plaintext[..count]);
+        attachment_data.append(&mut buffer);
     }
 
-    let mut mac = [0u8; 10];
-    reader.read_exact(&mut mac)?;
-    if verify_mac {
-        let hmac_result = cipher_data.hmac.result();
-        let calculated_mac = &hmac_result.code()[..10];
-        cipher_data.hmac.reset();
-        if !crypto::util::fixed_time_eq(calculated_mac, &mac) {
-            return Err(anyhow!(
-                "MacVerificationError, {:?}, {:?}.",
-                calculated_mac.to_vec(),
-                mac.to_vec()
-            ));
-        }
+    reader.read_exact(&mut attachment_hmac)?;
+    if let Some(decrypter) = decrypter {
+        decrypter.verify_mac(&attachment_hmac)?;
+        decrypter.increase_iv();
     }
-    increase_counter(&mut cipher_data.counter, None);
-    Ok((plaintext_total, length))
+
+    Ok((attachment_data, length))
 }
 
 fn decode_backup<R: Read>(
@@ -149,15 +76,11 @@ fn decode_backup<R: Read>(
 ) -> Result<usize, anyhow::Error> {
     let mut decrypter: Option<decrypter::Decrypter> = None;
 
-    let mut cipher_data: Option<CipherData> = None;
-    let verify_mac = config.no_verify_mac;
-
     let mut frame_count = 0;
     let mut seek_position = 0;
 
     loop {
-        let (consumed_bytes, frame_content) =
-            read_frame(&mut reader, &mut cipher_data, verify_mac, &mut decrypter)?;
+        let (consumed_bytes, frame_content) = read_frame(&mut reader, &mut decrypter)?;
         seek_position += consumed_bytes;
         let frame = protobuf::parse_from_bytes::<Backups::BackupFrame>(&frame_content)
             .unwrap_or_else(|_| panic!("Could not parse frame from {:?}", frame_content));
@@ -165,30 +88,22 @@ fn decode_backup<R: Read>(
 
         match frame {
             frame::Frame::Header { salt, iv } => {
-                let (cipher_key, mac_key) =
-                    generate_keys(&config.password, salt).expect("Error generating keys");
                 decrypter = Some(decrypter::Decrypter::new(
                     &config.password,
                     salt,
                     iv,
                     config.no_verify_mac,
                 ));
-                cipher_data = Some(CipherData {
-                    hmac: crypto::hmac::Hmac::new(crypto::sha2::Sha256::new(), &mac_key),
-                    cipher_key,
-                    counter: iv.to_vec(),
-                })
             }
             frame::Frame::Version { version } => {
                 println!("Database Version: {:?}", version);
             }
             frame::Frame::Attachment { attachment } => {
-                if let Some(ref mut c) = cipher_data {
+                if decrypter.is_some() {
                     let (data, read_bytes) = read_attachment(
                         &mut reader,
-                        c,
                         attachment.get_length().try_into()?,
-                        verify_mac,
+                        &mut decrypter,
                     )?;
                     seek_position += read_bytes;
                     output.write_attachment(
@@ -201,12 +116,11 @@ fn decode_backup<R: Read>(
                 }
             }
             frame::Frame::Avatar { avatar } => {
-                if let Some(ref mut c) = cipher_data {
+                if decrypter.is_some() {
                     let (data, read_bytes) = read_attachment(
                         &mut reader,
-                        c,
                         avatar.get_length().try_into()?,
-                        verify_mac,
+                        &mut decrypter,
                     )?;
                     seek_position += read_bytes;
                     output.write_avatar(&data, avatar.get_name())?;
@@ -215,12 +129,11 @@ fn decode_backup<R: Read>(
                 }
             }
             frame::Frame::Sticker { sticker } => {
-                if let Some(ref mut c) = cipher_data {
+                if decrypter.is_some() {
                     let (data, read_bytes) = read_attachment(
                         &mut reader,
-                        c,
                         sticker.get_length().try_into()?,
-                        verify_mac,
+                        &mut decrypter,
                     )?;
                     seek_position += read_bytes;
                     output.write_sticker(&data, sticker.get_rowId())?;
