@@ -193,10 +193,6 @@ impl Output {
         Ok(())
     }
 
-    pub fn get_attachment_count(&self) -> usize {
-        self.count_attachment
-    }
-
     fn set_directory(
         base: &std::path::Path,
         name: &str,
