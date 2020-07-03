@@ -12,11 +12,24 @@ mod frame;
 mod input;
 mod output_raw;
 
-fn decode_backup(
-    config: &args::Config,
-    output: &mut output_raw::Output,
-    callback: fn(usize, usize),
-) -> Result<(), anyhow::Error> {
+fn frame_callback(frame_count: usize, seek_position: usize) {
+    std::io::stdout()
+        .write_all(
+            format!(
+                "Successfully read {} frames, {} bytes into file\r",
+                frame_count, seek_position
+            )
+            .as_bytes(),
+        )
+        .expect("Error writing status to stdout");
+    std::io::stdout().flush().expect("Error flushing stdout");
+}
+
+fn run(config: &args::Config) -> Result<(), anyhow::Error> {
+    // output
+    let mut output = output_raw::Output::new(&config.path_output_main, true)?;
+
+    // input
     let mut reader =
         input::InputFile::new(&config.path_input, &config.password, config.no_verify_mac)?;
 
@@ -61,30 +74,8 @@ fn decode_backup(
             _ => return Err(anyhow!("unexpected header found")),
         };
 
-        callback(reader.get_count_frame(), reader.get_count_byte());
+        frame_callback(reader.get_count_frame(), reader.get_count_byte());
     }
-
-    Ok(())
-}
-
-fn frame_callback(frame_count: usize, seek_position: usize) {
-    std::io::stdout()
-        .write_all(
-            format!(
-                "Successfully read {} frames, {} bytes into file\r",
-                frame_count, seek_position
-            )
-            .as_bytes(),
-        )
-        .expect("Error writing status to stdout");
-    std::io::stdout().flush().expect("Error flushing stdout");
-}
-
-fn run(config: &args::Config) -> Result<(), anyhow::Error> {
-    // output
-    let mut output = output_raw::Output::new(&config.path_output_main, true)?;
-
-    decode_backup(config, &mut output, frame_callback)?;
 
     println!();
     Ok(())
