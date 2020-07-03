@@ -31,7 +31,7 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 
 	// input
 	let mut reader =
-		input::InputFile::new(&config.path_input, &config.password, config.no_verify_mac)?;
+		input::InputFile::new(&config.path_input, &config.password, config.verify_mac)?;
 
 	loop {
 		let frame = reader.read_frame()?;
