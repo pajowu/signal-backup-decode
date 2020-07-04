@@ -87,7 +87,6 @@ fn increase_counter(counter: &mut Vec<u8>, start: Option<usize>) {
 			counter[i] += 1;
 			break;
 		} else {
-			// else if counter[i] == 255 unnecessary
 			counter[i] = 0;
 			i -= 1
 		}
