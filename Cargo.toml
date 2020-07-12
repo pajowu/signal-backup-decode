@@ -1,6 +1,6 @@
 [package]
 name = "signal-backup-decode"
-version = "0.1.3"
+version = "0.1.5"
 authors = ["pajowu <pajowu@pajowu.de>"]
 build = "build.rs"
 description = "A simple tool to decode signal backups"
