@@ -4,7 +4,7 @@ This repository contains a small programm to decode a backup produced by [Signal
 
 ## Installation
 
-**Rust v1.26 or higher is required**
+**Rust v1.40 or higher is required**
 
 ```
 cargo install signal-backup-decode
