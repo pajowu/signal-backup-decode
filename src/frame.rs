@@ -37,7 +37,7 @@ impl<'a> Frame<'a> {
 				salt: frame.get_header().get_salt(),
 				iv: frame.get_header().get_iv(),
 			});
-		}
+		};
 
 		if frame.has_statement() {
 			fields_count += 1;
@@ -63,54 +63,54 @@ impl<'a> Frame<'a> {
 					params
 				},
 			});
-		}
+		};
 
 		if frame.has_preference() {
 			fields_count += 1;
 			ret = Some(Self::Preference {
 				preference: frame.get_preference(),
 			});
-		}
+		};
 
 		if frame.has_attachment() {
 			fields_count += 1;
 			ret = Some(Self::Attachment {
 				attachment: frame.get_attachment(),
 			});
-		}
+		};
 
 		if frame.has_version() {
 			fields_count += 1;
 			ret = Some(Self::Version {
 				version: frame.get_version().get_version(),
 			});
-		}
+		};
 
 		if frame.has_end() {
 			fields_count += 1;
 			ret = Some(Self::End);
-		}
+		};
 
 		if frame.has_avatar() {
 			fields_count += 1;
 			ret = Some(Self::Avatar {
 				avatar: frame.get_avatar(),
 			});
-		}
+		};
 
 		if frame.has_sticker() {
 			fields_count += 1;
 			ret = Some(Self::Sticker {
 				sticker: frame.get_sticker(),
 			});
-		}
+		};
 
 		if fields_count != 1 {
 			panic!(
 				"Frame with an unsupported number of fields found, please report to author: {:?}",
 				frame
 			);
-		}
+		};
 
 		ret.unwrap()
 	}

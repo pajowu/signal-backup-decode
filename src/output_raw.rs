@@ -201,10 +201,10 @@ impl Output {
 			std::fs::create_dir(&folder)
 				.with_context(|| format!("{} could not be created.", folder.to_string_lossy()))?;
 		} else if !folder.is_dir() {
-			Err(anyhow!(
+			return Err(anyhow!(
 				"{} exists and is not a directory.",
 				folder.to_string_lossy()
-			))?;
+			));
 		}
 
 		Ok(folder)

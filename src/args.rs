@@ -70,7 +70,7 @@ impl Config {
 
 		Ok(Self {
 			path_input: input_file,
-			path_output_main: output_path.clone(),
+			path_output_main: output_path,
 			password,
 			verify_mac: !matches.is_present("no_verify_mac"),
 			log_level: log::LevelFilter::Info,
