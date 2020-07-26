@@ -78,7 +78,6 @@ impl InputFile {
 			.unwrap()
 			.try_into()
 			.unwrap();
-		let len = len as usize;
 		let mut frame_content = vec![0u8; len - 10];
 		let mut frame_hmac = [0u8; 10];
 
