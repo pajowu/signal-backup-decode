@@ -15,7 +15,7 @@ fn frame_callback(frame_count: usize, seek_position: usize) {
 	std::io::stdout()
 		.write_all(
 			format!(
-				"Successfully read {} frames and {} bytes. Info about writen bytes is missing.\r",
+				"Successfully read {} frames and {} bytes. Info about written bytes is missing.\r",
 				frame_count, seek_position
 			)
 			.as_bytes(),
@@ -94,6 +94,8 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
             for received in status_rx {
                 frame_callback(received.0, received.1);
             };
+
+            println!("");
         });
 
         thread_input.join().unwrap()?;
