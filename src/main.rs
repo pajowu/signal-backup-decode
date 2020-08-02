@@ -2,7 +2,6 @@ use anyhow::anyhow;
 use anyhow::Context;
 use log::error;
 use log::info;
-use std::convert::TryInto;
 use std::io::Write;
 
 mod Backups;
@@ -43,21 +42,21 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 			frame::Frame::Version { version } => {
 				println!("Database Version: {:?}", version);
 			}
-			frame::Frame::Attachment { attachment } => {
-				let data = reader.read_data(attachment.get_length().try_into()?)?;
-				output.write_attachment(
-					&data,
-					attachment.get_attachmentId(),
-					attachment.get_rowId(),
-				)?;
+			frame::Frame::Attachment {
+				data_length,
+				id,
+				row,
+			} => {
+				let data = reader.read_data(data_length)?;
+				output.write_attachment(&data, id, row)?;
 			}
-			frame::Frame::Avatar { avatar } => {
-				let data = reader.read_data(avatar.get_length().try_into()?)?;
-				output.write_avatar(&data, avatar.get_name())?;
+			frame::Frame::Avatar { data_length, name } => {
+				let data = reader.read_data(data_length)?;
+				output.write_avatar(&data, name)?;
 			}
-			frame::Frame::Sticker { sticker } => {
-				let data = reader.read_data(sticker.get_length().try_into()?)?;
-				output.write_sticker(&data, sticker.get_rowId())?;
+			frame::Frame::Sticker { data_length, row } => {
+				let data = reader.read_data(data_length)?;
+				output.write_sticker(&data, row)?;
 			}
 			frame::Frame::Statement {
 				statement,

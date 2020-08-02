@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 /// Frame
 pub enum Frame<'a> {
 	Header {
@@ -12,17 +14,21 @@ pub enum Frame<'a> {
 		preference: &'a crate::Backups::SharedPreference,
 	},
 	Attachment {
-		attachment: &'a crate::Backups::Attachment,
+                data_length: usize,
+                id: u64,
+                row: u64,
 	},
 	Version {
 		version: u32,
 	},
 	End,
 	Avatar {
-		avatar: &'a crate::Backups::Avatar,
+            data_length: usize,
+            name: &'a str,
 	},
 	Sticker {
-		sticker: &'a crate::Backups::Sticker,
+                data_length: usize,
+                row: u64,
 	},
 }
 
@@ -75,7 +81,9 @@ impl<'a> Frame<'a> {
 		if frame.has_attachment() {
 			fields_count += 1;
 			ret = Some(Self::Attachment {
-				attachment: frame.get_attachment(),
+                                data_length: frame.get_attachment().get_length().try_into().unwrap(),
+                                id: frame.get_attachment().get_attachmentId(),
+                                row: frame.get_attachment().get_rowId(),
 			});
 		};
 
@@ -94,14 +102,16 @@ impl<'a> Frame<'a> {
 		if frame.has_avatar() {
 			fields_count += 1;
 			ret = Some(Self::Avatar {
-				avatar: frame.get_avatar(),
+                                data_length: frame.get_avatar().get_length().try_into().unwrap(),
+                                name: frame.get_avatar().get_name(),
 			});
 		};
 
 		if frame.has_sticker() {
 			fields_count += 1;
 			ret = Some(Self::Sticker {
-				sticker: frame.get_sticker(),
+                                data_length: frame.get_sticker().get_length().try_into().unwrap(),
+                                row: frame.get_sticker().get_rowId(),
 			});
 		};
 
