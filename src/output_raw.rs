@@ -74,7 +74,7 @@ impl Output {
 	pub fn write_statement(
 		&self,
 		statement: &str,
-		parameters: Vec<rusqlite::types::ToSqlOutput>,
+		parameters: &[rusqlite::types::Value],
 	) -> Result<(), anyhow::Error> {
 		// In database version 9 signal added full text search and uses TRIGGERs to create the virtual tables. however this breaks when importing the data.
 		if statement.starts_with("CREATE TRIGGER")
@@ -190,6 +190,17 @@ impl Output {
 
 		Ok(())
 	}
+
+        pub fn write_frame(&mut self, frame: crate::frame::Frame) -> Result<(), anyhow::Error> {
+            match frame {
+                crate::frame::Frame::Statement { statement, parameter } => self.write_statement(&statement, &parameter),
+                crate::frame::Frame::Preference { preference } => self.write_preference(&preference),
+                crate::frame::Frame::Attachment { id, row, data, .. } => self.write_attachment(data.as_ref().unwrap(), id, row),
+                crate::frame::Frame::Avatar { name, data, .. } => self.write_avatar(data.as_ref().unwrap(), &name),
+                crate::frame::Frame::Sticker { row, data, .. } => self.write_sticker(data.as_ref().unwrap(), row),
+                _ => return Err(anyhow!("unexpected frame found")),
+            }
+        }
 
 	fn set_directory(
 		base: &std::path::Path,

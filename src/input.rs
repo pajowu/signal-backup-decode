@@ -32,15 +32,15 @@ impl InputFile {
 			.unwrap();
 		let mut frame_content = vec![0u8; len];
 		reader.read_exact(&mut frame_content)?;
-		let frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
+		let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
 			.with_context(|| format!("Could not parse frame from {:?}", frame_content))?;
-		let frame = crate::frame::Frame::new(&frame);
+		let frame = crate::frame::Frame::new(&mut frame);
 
 		// check that frame is a header and return
 		match frame {
 			crate::frame::Frame::Header { salt, iv } => Ok(Self {
 				reader,
-				decrypter: crate::decrypter::Decrypter::new(&password, salt, iv, verify_mac),
+				decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
 				count_frame: 1,
 				count_byte: len,
 			}),
