@@ -32,8 +32,9 @@ impl InputFile {
 			.unwrap();
 		let mut frame_content = vec![0u8; len];
 		reader.read_exact(&mut frame_content)?;
-		let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
-			.with_context(|| format!("Could not parse frame from {:?}", frame_content))?;
+		let mut frame =
+			protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
+				.with_context(|| format!("Could not parse frame from {:?}", frame_content))?;
 		let frame = crate::frame::Frame::new(&mut frame);
 
 		// check that frame is a header and return

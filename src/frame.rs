@@ -17,7 +17,7 @@ pub enum Frame {
 		data_length: usize,
 		id: u64,
 		row: u64,
-                data: Option<Vec<u8>>,
+		data: Option<Vec<u8>>,
 	},
 	Version {
 		version: u32,
@@ -26,12 +26,12 @@ pub enum Frame {
 	Avatar {
 		data_length: usize,
 		name: String,
-                data: Option<Vec<u8>>,
+		data: Option<Vec<u8>>,
 	},
 	Sticker {
 		data_length: usize,
 		row: u64,
-                data: Option<Vec<u8>>,
+		data: Option<Vec<u8>>,
 	},
 }
 
@@ -42,7 +42,7 @@ impl Frame {
 
 		if frame.has_header() {
 			fields_count += 1;
-                        let mut header = frame.take_header();
+			let mut header = frame.take_header();
 			ret = Some(Self::Header {
 				salt: header.take_salt(),
 				iv: header.take_iv(),
@@ -51,7 +51,7 @@ impl Frame {
 
 		if frame.has_statement() {
 			fields_count += 1;
-                        let mut statement = frame.take_statement();
+			let mut statement = frame.take_statement();
 			ret = Some(Self::Statement {
 				statement: statement.take_statement(),
 				parameter: {
@@ -85,12 +85,12 @@ impl Frame {
 
 		if frame.has_attachment() {
 			fields_count += 1;
-                        let attachment = frame.take_attachment();
+			let attachment = frame.take_attachment();
 			ret = Some(Self::Attachment {
 				data_length: attachment.get_length().try_into().unwrap(),
 				id: attachment.get_attachmentId(),
 				row: attachment.get_rowId(),
-                                data: None,
+				data: None,
 			});
 		};
 
@@ -108,21 +108,21 @@ impl Frame {
 
 		if frame.has_avatar() {
 			fields_count += 1;
-                        let mut avatar = frame.take_avatar();
+			let mut avatar = frame.take_avatar();
 			ret = Some(Self::Avatar {
 				data_length: avatar.get_length().try_into().unwrap(),
 				name: avatar.take_name(),
-                                data: None,
+				data: None,
 			});
 		};
 
 		if frame.has_sticker() {
 			fields_count += 1;
-                        let sticker = frame.take_sticker();
+			let sticker = frame.take_sticker();
 			ret = Some(Self::Sticker {
 				data_length: sticker.get_length().try_into().unwrap(),
 				row: sticker.get_rowId(),
-                                data: None,
+				data: None,
 			});
 		};
 
@@ -136,12 +136,12 @@ impl Frame {
 		ret.unwrap()
 	}
 
-        pub fn set_data(&mut self, data_add: Vec<u8>) {
-            match self {
-                Frame::Attachment { ref mut data, .. } => *data = Some(data_add),
-                Frame::Avatar { ref mut data, .. } => *data = Some(data_add),
-                Frame::Sticker { ref mut data, .. } => *data = Some(data_add),
-                _ => panic!("Cannot set data on variant without data field.")
-            }
-        }
+	pub fn set_data(&mut self, data_add: Vec<u8>) {
+		match self {
+			Frame::Attachment { ref mut data, .. } => *data = Some(data_add),
+			Frame::Avatar { ref mut data, .. } => *data = Some(data_add),
+			Frame::Sticker { ref mut data, .. } => *data = Some(data_add),
+			_ => panic!("Cannot set data on variant without data field."),
+		}
+	}
 }

@@ -84,14 +84,12 @@ impl Output {
 			return Ok(());
 		}
 
-		self.sqlite_connection
-			.execute(statement, parameters)
-			.with_context(|| {
-				format!(
-					"failed to write this statement into database: {}",
-					statement
-				)
-			})?;
+		let mut stmt = self
+			.sqlite_connection
+			.prepare_cached(statement)
+			.with_context(|| format!("failed to prepare database statement: {}", statement))?;
+		stmt.execute(parameters)
+			.with_context(|| format!("failed to execute database statement: {}", statement))?;
 
 		Ok(())
 	}
@@ -191,16 +189,25 @@ impl Output {
 		Ok(())
 	}
 
-        pub fn write_frame(&mut self, frame: crate::frame::Frame) -> Result<(), anyhow::Error> {
-            match frame {
-                crate::frame::Frame::Statement { statement, parameter } => self.write_statement(&statement, &parameter),
-                crate::frame::Frame::Preference { preference } => self.write_preference(&preference),
-                crate::frame::Frame::Attachment { id, row, data, .. } => self.write_attachment(data.as_ref().unwrap(), id, row),
-                crate::frame::Frame::Avatar { name, data, .. } => self.write_avatar(data.as_ref().unwrap(), &name),
-                crate::frame::Frame::Sticker { row, data, .. } => self.write_sticker(data.as_ref().unwrap(), row),
-                _ => return Err(anyhow!("unexpected frame found")),
-            }
-        }
+	pub fn write_frame(&mut self, frame: crate::frame::Frame) -> Result<(), anyhow::Error> {
+		match frame {
+			crate::frame::Frame::Statement {
+				statement,
+				parameter,
+			} => self.write_statement(&statement, &parameter),
+			crate::frame::Frame::Preference { preference } => self.write_preference(&preference),
+			crate::frame::Frame::Attachment { id, row, data, .. } => {
+				self.write_attachment(data.as_ref().unwrap(), id, row)
+			}
+			crate::frame::Frame::Avatar { name, data, .. } => {
+				self.write_avatar(data.as_ref().unwrap(), &name)
+			}
+			crate::frame::Frame::Sticker { row, data, .. } => {
+				self.write_sticker(data.as_ref().unwrap(), row)
+			}
+			_ => return Err(anyhow!("unexpected frame found")),
+		}
+	}
 
 	fn set_directory(
 		base: &std::path::Path,

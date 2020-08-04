@@ -32,75 +32,70 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	let mut reader =
 		input::InputFile::new(&config.path_input, &config.password, config.verify_mac)?;
 
-        // channel to parallelize input reading / processing and output writing
-        // and to display correct status
-        let (frame_tx, frame_rx) = std::sync::mpsc::channel();
-        let (status_tx, status_rx) = std::sync::mpsc::channel();
+	// channel to parallelize input reading / processing and output writing
+	// and to display correct status
+	let (frame_tx, frame_rx) = std::sync::mpsc::channel();
+	let (status_tx, status_rx) = std::sync::mpsc::channel();
 
-        let thread_input = std::thread::spawn(move || -> Result<(), anyhow::Error> {
-            loop {
-                    let frame = reader.read_frame()?;
-                    let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame)
-                            .with_context(|| format!("Could not parse frame from {:?}", frame))?;
-                    let mut frame = crate::frame::Frame::new(&mut frame);
+	let thread_input = std::thread::spawn(move || -> Result<(), anyhow::Error> {
+		loop {
+			let frame = reader.read_frame()?;
+			let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame)
+				.with_context(|| format!("Could not parse frame from {:?}", frame))?;
+			let mut frame = crate::frame::Frame::new(&mut frame);
 
-                    match frame {
-                            frame::Frame::Version { version } => {
-                                    info!("Database Version: {:?}", version);
-                            }
-                            frame::Frame::Attachment { data_length, .. } => {
-                                    frame.set_data(reader.read_data(data_length)?);
-                                    frame_tx.send(frame).unwrap();
-                            }
-                            frame::Frame::Avatar {
-                                    data_length,
-                                    ..
-                            } => {
-                                    frame.set_data(reader.read_data(data_length)?);
-                                    frame_tx.send(frame).unwrap();
-                            }
-                            frame::Frame::Sticker {
-                                    data_length,
-                                    ..
-                            } => {
-                                    frame.set_data(reader.read_data(data_length)?);
-                                    frame_tx.send(frame).unwrap();
-                            }
-                            frame::Frame::Header { .. } => return Err(anyhow!("unexpected header found")),
-                            frame::Frame::End => {
-                                    break;
-                            },
-                            _ => {
+			match frame {
+				frame::Frame::Version { version } => {
+					info!("Database Version: {:?}", version);
+				}
+				frame::Frame::Attachment { data_length, .. } => {
+					frame.set_data(reader.read_data(data_length)?);
+					frame_tx.send(frame).unwrap();
+				}
+				frame::Frame::Avatar { data_length, .. } => {
+					frame.set_data(reader.read_data(data_length)?);
+					frame_tx.send(frame).unwrap();
+				}
+				frame::Frame::Sticker { data_length, .. } => {
+					frame.set_data(reader.read_data(data_length)?);
+					frame_tx.send(frame).unwrap();
+				}
+				frame::Frame::Header { .. } => return Err(anyhow!("unexpected header found")),
+				frame::Frame::End => {
+					break;
+				}
+				_ => {
+					frame_tx.send(frame).unwrap();
+				}
+			};
 
-                                    frame_tx.send(frame).unwrap();
-                            }
-                    };
+			status_tx
+				.send((reader.get_count_frame(), reader.get_count_byte()))
+				.unwrap();
+		}
 
-                    status_tx.send((reader.get_count_frame(), reader.get_count_byte())).unwrap();
-            }
+		Ok(())
+	});
 
-            Ok(())
-        });
+	let thread_output = std::thread::spawn(move || -> Result<(), anyhow::Error> {
+		for received in frame_rx {
+			output.write_frame(received)?;
+		}
 
-        let thread_output = std::thread::spawn(move || -> Result<(), anyhow::Error> {
-            for received in frame_rx {
-                output.write_frame(received)?;
-            };
+		Ok(())
+	});
 
-            Ok(())
-        });
+	let thread_status = std::thread::spawn(move || {
+		for received in status_rx {
+			frame_callback(received.0, received.1);
+		}
 
-        let thread_status = std::thread::spawn(move || {
-            for received in status_rx {
-                frame_callback(received.0, received.1);
-            };
+		println!("");
+	});
 
-            println!("");
-        });
-
-        thread_input.join().unwrap()?;
-        thread_output.join().unwrap()?;
-        thread_status.join().unwrap();
+	thread_input.join().unwrap()?;
+	thread_output.join().unwrap()?;
+	thread_status.join().unwrap();
 
 	Ok(())
 }
