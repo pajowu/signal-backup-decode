@@ -2,11 +2,13 @@ use anyhow::anyhow;
 use anyhow::Context;
 use log::error;
 use log::info;
+use std::convert::TryInto;
 use std::io::Write;
 
 mod Backups;
 mod args;
 mod decrypter;
+mod display;
 mod frame;
 mod input;
 mod output_raw;
@@ -32,10 +34,14 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	let mut reader =
 		input::InputFile::new(&config.path_input, &config.password, config.verify_mac)?;
 
+	// progress bar
+	let progress = display::Progress::new();
+
 	// channel to parallelize input reading / processing and output writing
 	// and to display correct status
 	let (frame_tx, frame_rx) = std::sync::mpsc::channel();
-	let (status_tx, status_rx) = std::sync::mpsc::channel();
+	let (status_t1x, status_rx) = std::sync::mpsc::channel();
+	let status_t2x = status_t1x.clone();
 
 	let thread_input = std::thread::spawn(move || -> Result<(), anyhow::Error> {
 		loop {
@@ -69,8 +75,8 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 				}
 			};
 
-			status_tx
-				.send((reader.get_count_frame(), reader.get_count_byte()))
+			status_t1x
+				.send((Some(reader.get_count_frame()), None))
 				.unwrap();
 		}
 
@@ -80,22 +86,29 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	let thread_output = std::thread::spawn(move || -> Result<(), anyhow::Error> {
 		for received in frame_rx {
 			output.write_frame(received)?;
+			status_t2x
+				.send((None, Some(output.get_written_frames())))
+				.unwrap();
 		}
 
 		Ok(())
 	});
 
-	let thread_status = std::thread::spawn(move || {
+	let thread_status_read = std::thread::spawn(move || {
 		for received in status_rx {
-			frame_callback(received.0, received.1);
+			if let Some(x) = received.0 {
+				progress.set_read_frames(x.try_into().unwrap());
+			} else if let Some(x) = received.1 {
+				progress.set_written_frames(x.try_into().unwrap());
+			}
 		}
 
-		println!("");
+		progress.finish();
 	});
 
 	thread_input.join().unwrap()?;
 	thread_output.join().unwrap()?;
-	thread_status.join().unwrap();
+	thread_status_read.join().unwrap();
 
 	Ok(())
 }
@@ -114,13 +127,8 @@ fn main() {
 	)
 	.unwrap();
 
-	// measuring runtime and run program
-	let now = std::time::Instant::now();
-
 	if let Err(e) = run(&config) {
 		error!("{}.", e);
 		std::process::exit(1);
 	}
-
-	info! {"Runtime duration: {} seconds", now.elapsed().as_secs()};
 }

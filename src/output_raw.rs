@@ -15,6 +15,7 @@ pub struct Output {
 	count_attachment: usize,
 	count_sticker: usize,
 	count_avatar: usize,
+	written_frames: usize,
 }
 
 impl Output {
@@ -68,11 +69,14 @@ impl Output {
 			count_attachment: 0,
 			count_sticker: 0,
 			count_avatar: 0,
+			// we set 2 read frames in the beginning because we have 1) a header frame
+			// and 2) a version frame we do not count in written frames.
+			written_frames: 2,
 		})
 	}
 
 	pub fn write_statement(
-		&self,
+		&mut self,
 		statement: &str,
 		parameters: &[rusqlite::types::Value],
 	) -> Result<(), anyhow::Error> {
@@ -90,6 +94,8 @@ impl Output {
 			.with_context(|| format!("failed to prepare database statement: {}", statement))?;
 		stmt.execute(parameters)
 			.with_context(|| format!("failed to execute database statement: {}", statement))?;
+
+		self.written_frames += 1;
 
 		Ok(())
 	}
@@ -115,6 +121,7 @@ impl Output {
 		})?;
 
 		self.count_attachment += 1;
+		self.written_frames += 1;
 
 		Ok(())
 	}
@@ -141,6 +148,7 @@ impl Output {
 
 		self.count_attachment += 1;
 		self.count_sticker += 1;
+		self.written_frames += 1;
 
 		Ok(())
 	}
@@ -167,12 +175,13 @@ impl Output {
 
 		self.count_attachment += 1;
 		self.count_avatar += 1;
+		self.written_frames += 1;
 
 		Ok(())
 	}
 
 	pub fn write_preference(
-		&self,
+		&mut self,
 		pref: &crate::Backups::SharedPreference,
 	) -> Result<(), anyhow::Error> {
 		let path = self.path_config.join(pref.get_file());
@@ -185,6 +194,8 @@ impl Output {
 				path.to_string_lossy()
 			)
 		})?;
+
+		self.written_frames += 1;
 
 		Ok(())
 	}
@@ -207,6 +218,10 @@ impl Output {
 			}
 			_ => return Err(anyhow!("unexpected frame found")),
 		}
+	}
+
+	pub fn get_written_frames(&self) -> usize {
+		self.written_frames
 	}
 
 	fn set_directory(

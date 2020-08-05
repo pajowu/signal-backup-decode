@@ -10,6 +10,7 @@ pub struct InputFile {
 	decrypter: crate::decrypter::Decrypter,
 	count_frame: usize,
 	count_byte: usize,
+	file_bytes: u64,
 }
 
 impl InputFile {
@@ -21,6 +22,7 @@ impl InputFile {
 		// open file
 		let file = std::fs::File::open(path)
 			.with_context(|| format!("Could not open backup file: {}", path.to_string_lossy()))?;
+		let file_bytes = file.metadata().unwrap().len();
 		let mut reader = std::io::BufReader::new(file);
 
 		// create decrypter
@@ -44,6 +46,7 @@ impl InputFile {
 				decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
 				count_frame: 1,
 				count_byte: len,
+				file_bytes,
 			}),
 			_ => Err(anyhow!("first frame is not a header")),
 		}
@@ -100,37 +103,8 @@ impl InputFile {
 	pub fn get_count_byte(&self) -> usize {
 		self.count_byte
 	}
-}
 
-//impl Iterator for InputFile {
-//    type Item = Result<Vec<u8>, anyhow::Error>;
-//
-//    fn next(&mut self) -> Option<Self::Item> {
-//        let len = self.reader.read_u32::<byteorder::BigEndian>()?.try_into()?;
-//        let mut frame_content = std::vec::Vec::with_capacity(len as usize - 10);
-//        let mut frame_hmac = [0u8; 10];
-//
-//        self.reader.read_exact(&mut frame_content)?;
-//        self.reader.read_exact(&mut frame_hmac)?;
-//        self.decrypter.decrypt(&mut frame_content);
-//        self.decrypter.verify_mac(&frame_hmac)?;
-//        self.decrypter.increase_iv();
-//
-//        self.count_frame += 1;
-//        self.count_byte += len as usize;
-//        Some(Ok(frame_content))
-//
-//        //let frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
-//        //    .with_context(|| format!("Could not parse frame: {:?}", frame_content))?;
-//        //let frame = crate::frame::Frame::new(frame);
-//
-//        //match frame {
-//        //    crate::frame::Frame::End => None,
-//        //    _ => {
-//        //        self.count_frame += 1;
-//        //        self.count_byte += len as usize;
-//        //        Some(Ok(frame.to_owned()))
-//        //    }
-//        //}
-//    }
-//}
+	pub fn get_file_size(&self) -> u64 {
+		self.file_bytes
+	}
+}
