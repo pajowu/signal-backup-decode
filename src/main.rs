@@ -35,13 +35,16 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 		input::InputFile::new(&config.path_input, &config.password, config.verify_mac)?;
 
 	// progress bar
-	let progress = display::Progress::new();
+	let progress = std::sync::Arc::new(display::Progress::new(
+		reader.get_file_size(),
+		reader.get_count_frame().try_into().unwrap(),
+	));
+	let progress_read = progress.clone();
+	let progress_write = progress.clone();
 
 	// channel to parallelize input reading / processing and output writing
 	// and to display correct status
 	let (frame_tx, frame_rx) = std::sync::mpsc::channel();
-	let (status_t1x, status_rx) = std::sync::mpsc::channel();
-	let status_t2x = status_t1x.clone();
 
 	let thread_input = std::thread::spawn(move || -> Result<(), anyhow::Error> {
 		loop {
@@ -75,40 +78,27 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 				}
 			};
 
-			status_t1x
-				.send((Some(reader.get_count_frame()), None))
-				.unwrap();
+			progress_read.set_read_frames(reader.get_count_frame().try_into().unwrap());
+			progress_read.set_read_bytes(reader.get_count_byte().try_into().unwrap());
 		}
 
+		progress_read.finish_bytes();
 		Ok(())
 	});
 
 	let thread_output = std::thread::spawn(move || -> Result<(), anyhow::Error> {
 		for received in frame_rx {
 			output.write_frame(received)?;
-			status_t2x
-				.send((None, Some(output.get_written_frames())))
-				.unwrap();
+			progress_write.set_written_frames(output.get_written_frames().try_into().unwrap());
 		}
 
+		progress_write.finish_frames();
 		Ok(())
 	});
 
-	let thread_status_read = std::thread::spawn(move || {
-		for received in status_rx {
-			if let Some(x) = received.0 {
-				progress.set_read_frames(x.try_into().unwrap());
-			} else if let Some(x) = received.1 {
-				progress.set_written_frames(x.try_into().unwrap());
-			}
-		}
-
-		progress.finish();
-	});
-
+	progress.finish_all();
 	thread_input.join().unwrap()?;
 	thread_output.join().unwrap()?;
-	thread_status_read.join().unwrap();
 
 	Ok(())
 }
