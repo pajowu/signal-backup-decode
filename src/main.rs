@@ -3,7 +3,6 @@ use anyhow::Context;
 use log::error;
 use log::info;
 use std::convert::TryInto;
-use std::io::Write;
 
 mod Backups;
 mod args;
@@ -12,19 +11,6 @@ mod display;
 mod frame;
 mod input;
 mod output_raw;
-
-fn frame_callback(frame_count: usize, seek_position: usize) {
-	std::io::stdout()
-		.write_all(
-			format!(
-				"Successfully read {} frames and {} bytes. Info about written bytes is missing.\r",
-				frame_count, seek_position
-			)
-			.as_bytes(),
-		)
-		.expect("Error writing status to stdout");
-	std::io::stdout().flush().expect("Error flushing stdout");
-}
 
 fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	// output

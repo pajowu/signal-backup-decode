@@ -216,7 +216,7 @@ impl Output {
 			crate::frame::Frame::Sticker { row, data, .. } => {
 				self.write_sticker(data.as_ref().unwrap(), row)
 			}
-			_ => return Err(anyhow!("unexpected frame found")),
+			_ => Err(anyhow!("unexpected frame found")),
 		}
 	}
 

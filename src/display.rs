@@ -14,8 +14,6 @@ impl Progress {
                     .template("Read vs. written frames: [{elapsed_precise}] [{bar:50.cyan/cyan}] {pos:>5}/{len:5}")
                     .progress_chars("#>-");
 
-		// we set 2 read frames in the beginning because we have 1) a header frame and 2) a version
-		// frame we do not count in written frames.
 		let multi = indicatif::MultiProgress::new();
 		let bar_bytes = multi.add(indicatif::ProgressBar::new(bytes_to_read));
 		bar_bytes.set_style(sty_bytes);
