@@ -30,7 +30,7 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 
 	// channel to parallelize input reading / processing and output writing
 	// and to display correct status
-	let (frame_tx, frame_rx) = std::sync::mpsc::channel();
+	let (frame_tx, frame_rx) = std::sync::mpsc::sync_channel(10);
 
 	let thread_input = std::thread::spawn(move || -> Result<(), anyhow::Error> {
 		loop {
