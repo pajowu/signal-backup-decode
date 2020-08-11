@@ -14,7 +14,7 @@ mod output_raw;
 
 fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	// output
-	let mut output = output_raw::Output::new(&config.path_output_main, true)?;
+	let mut output = output_raw::Output::new(&config.path_output, true)?;
 
 	// input
 	let mut reader =

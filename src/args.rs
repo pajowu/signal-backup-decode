@@ -1,6 +1,6 @@
 // imports
 use anyhow::Context;
-use clap::{clap_app, crate_authors, crate_description, crate_name, crate_version};
+use clap::{crate_authors, crate_description, crate_name, crate_version};
 use std::io::BufRead;
 
 /// Config struct
@@ -9,7 +9,7 @@ use std::io::BufRead;
 #[derive(Debug)]
 pub struct Config {
 	pub path_input: std::path::PathBuf,
-	pub path_output_main: std::path::PathBuf,
+	pub path_output: std::path::PathBuf,
 	pub password: Vec<u8>,
 	pub verify_mac: bool,
 	pub log_level: log::LevelFilter,
@@ -18,59 +18,79 @@ pub struct Config {
 impl Config {
 	/// Create new config object
 	pub fn new() -> Result<Self, anyhow::Error> {
-		// TODO move here to another style? maybe it's easier to read
-		let matches = clap_app!(myapp =>
-                    (name: crate_name!())
-                    (version: crate_version!())
-                    (author: crate_authors!())
-                    (about: crate_description!())
-                    (@group password =>
-                            (@attributes +required !multiple)
-                            (@arg password_string: -p --("password") [PASSWORD] "Backup password (30 digits, with or without spaces)")
-                            (@arg password_file: -f --("password_file") [FILE] "File to read the Backup password from")
-                        )
-                        (@group output_options =>
-                            (@attributes !required +multiple)
-                            (@arg output_path: -o --("output-path") [FOLDER] "Directory to save output to")
-                        )
-                        (@arg no_verify_mac: --("no-verify-mac") "Do not verify the HMAC of each frame in the backup")
-                        (@arg INPUT: * "Sets the input file to use")).get_matches();
+		// TODO add check argument
+		let matches = clap::App::new(crate_name!())
+                    .version(crate_version!())
+                    .about(crate_description!())
+                    .author(crate_authors!())
+                    .arg(clap::Arg::with_name("input-file")
+                        .help("Sets the input file to use")
+                        .takes_value(true)
+                        .value_name("INPUT")
+                        .required(true)
+                        .index(1))
+                    .arg(clap::Arg::with_name("output-path")
+                        .help("Directory to save output to. If not given, input file directory is used")
+                        .long("output-path")
+                        .short("o")
+                        .takes_value(true)
+                        .value_name("FOLDER"))
+                    .arg(clap::Arg::with_name("no-verify-mac")
+                        .help("Do not verify the HMAC of each frame in the backup")
+                        .long("no-verify-mac"))
+                    .arg(clap::Arg::with_name("password-string")
+                        .help("Backup password (30 digits, with or without spaces)")
+                        .long("password")
+                        .takes_value(true)
+                        .value_name("PASSWORD")
+                        .short("p"))
+                    .arg(clap::Arg::with_name("password-file")
+                        .help("File to read the Backup password from")
+                        .long("password-file")
+                        .short("f")
+                        .takes_value(true)
+                        .value_name("FILE"))
+                    .group(clap::ArgGroup::with_name("password")
+                        .args(&["password-string", "password-file"])
+                        .required(true)
+                        .multiple(false))
+                    .get_matches();
 
-		let input_file = std::path::PathBuf::from(matches.value_of("INPUT").unwrap());
+
+		let input_file = std::path::PathBuf::from(matches.value_of("input-file").unwrap());
 
 		// TODO add force / overwrite CLI argument instead of default overwriting?
-		let output_path = if let Some(path) = matches.value_of("output_path") {
-			std::path::PathBuf::from(path)
-		} else {
-			let path =
-				input_file.file_stem().unwrap().to_str().context(
-					"output_path is not given and path to input file could not be read.",
-				)?;
-			std::path::PathBuf::from(path)
-		};
+		let output_path = std::path::PathBuf::from(matches.value_of("output-path").unwrap_or({
 
-		let mut password = match matches.value_of("password_string") {
-			Some(p) => String::from(p),
-			None => {
-				let password_file = std::io::BufReader::new(
-					std::fs::File::open(matches.value_of("password_file").unwrap())
-						.expect("Unable to open password file"),
+				input_file.file_stem().unwrap().to_str().context(
+					"output-path is not given and path to input file could not be read.",
+				)?
+                }));
+
+                // TODO password from command
+		let mut password = {
+                    if matches.is_present("password-string") {
+                        String::from(matches.value_of("password-string").unwrap())
+                    } else if matches.is_present("password-file") {
+                        let password_file = std::io::BufReader::new(
+					std::fs::File::open(matches.value_of("password-file").unwrap())
+						.context("Unable to open password file")?,
 				);
 				password_file
 					.lines()
 					.next()
-					.expect("Password file is empty")
-					.expect("Unable to read from password file")
-			}
-		};
-
+                                        .context("Password file is empty")?
+					.context("Unable to read from password file")?
+                    } else {
+                        unreachable!()
+                    }
+                };
 		password.retain(|c| c >= '0' && c <= '9');
-
 		let password = password.as_bytes().to_vec();
 
 		Ok(Self {
 			path_input: input_file,
-			path_output_main: output_path,
+			path_output: output_path,
 			password,
 			verify_mac: !matches.is_present("no_verify_mac"),
 			log_level: log::LevelFilter::Info,
