@@ -19,72 +19,102 @@ impl Config {
 	/// Create new config object
 	pub fn new() -> Result<Self, anyhow::Error> {
 		// TODO add check argument
+		// TODO add verbosity argument
 		let matches = clap::App::new(crate_name!())
-                    .version(crate_version!())
-                    .about(crate_description!())
-                    .author(crate_authors!())
-                    .arg(clap::Arg::with_name("input-file")
-                        .help("Sets the input file to use")
-                        .takes_value(true)
-                        .value_name("INPUT")
-                        .required(true)
-                        .index(1))
-                    .arg(clap::Arg::with_name("output-path")
-                        .help("Directory to save output to. If not given, input file directory is used")
-                        .long("output-path")
-                        .short("o")
-                        .takes_value(true)
-                        .value_name("FOLDER"))
-                    .arg(clap::Arg::with_name("no-verify-mac")
-                        .help("Do not verify the HMAC of each frame in the backup")
-                        .long("no-verify-mac"))
-                    .arg(clap::Arg::with_name("password-string")
-                        .help("Backup password (30 digits, with or without spaces)")
-                        .long("password")
-                        .takes_value(true)
-                        .value_name("PASSWORD")
-                        .short("p"))
-                    .arg(clap::Arg::with_name("password-file")
-                        .help("File to read the Backup password from")
-                        .long("password-file")
-                        .short("f")
-                        .takes_value(true)
-                        .value_name("FILE"))
-                    .group(clap::ArgGroup::with_name("password")
-                        .args(&["password-string", "password-file"])
-                        .required(true)
-                        .multiple(false))
-                    .get_matches();
-
+			.version(crate_version!())
+			.about(crate_description!())
+			.author(crate_authors!())
+			.arg(
+				clap::Arg::with_name("input-file")
+					.help("Sets the input file to use")
+					.takes_value(true)
+					.value_name("INPUT")
+					.required(true)
+					.index(1),
+			)
+			.arg(
+				clap::Arg::with_name("output-path")
+					.help("Directory to save output to. If not given, input file directory is used")
+					.long("output-path")
+					.short("o")
+					.takes_value(true)
+					.value_name("FOLDER"),
+			)
+			.arg(
+				clap::Arg::with_name("no-verify-mac")
+					.help("Do not verify the HMAC of each frame in the backup")
+					.long("no-verify-mac"),
+			)
+			.arg(
+				clap::Arg::with_name("password-string")
+					.help("Backup password (30 digits, with or without spaces)")
+					.long("password")
+					.takes_value(true)
+					.value_name("PASSWORD")
+					.short("p"),
+			)
+			.arg(
+				clap::Arg::with_name("password-file")
+					.help("File to read the backup password from")
+					.long("password-file")
+					.short("f")
+					.takes_value(true)
+					.value_name("FILE"),
+			)
+			.arg(
+				clap::Arg::with_name("password-command")
+					.help("Read backup password from stdout from COMMAND")
+					.long("password-command")
+					.takes_value(true)
+					.value_name("COMMAND"),
+			)
+			.group(
+				clap::ArgGroup::with_name("password")
+					.args(&["password-string", "password-file", "password-command"])
+					.required(true)
+					.multiple(false),
+			)
+			.get_matches();
 
 		let input_file = std::path::PathBuf::from(matches.value_of("input-file").unwrap());
 
 		// TODO add force / overwrite CLI argument instead of default overwriting?
 		let output_path = std::path::PathBuf::from(matches.value_of("output-path").unwrap_or({
+			input_file
+				.file_stem()
+				.unwrap()
+				.to_str()
+				.context("output-path is not given and path to input file could not be read.")?
+		}));
 
-				input_file.file_stem().unwrap().to_str().context(
-					"output-path is not given and path to input file could not be read.",
-				)?
-                }));
-
-                // TODO password from command
 		let mut password = {
-                    if matches.is_present("password-string") {
-                        String::from(matches.value_of("password-string").unwrap())
-                    } else if matches.is_present("password-file") {
-                        let password_file = std::io::BufReader::new(
+			if matches.is_present("password-string") {
+				String::from(matches.value_of("password-string").unwrap())
+			} else if matches.is_present("password-file") {
+				let password_file = std::io::BufReader::new(
 					std::fs::File::open(matches.value_of("password-file").unwrap())
 						.context("Unable to open password file")?,
 				);
 				password_file
 					.lines()
 					.next()
-                                        .context("Password file is empty")?
+					.context("Password file is empty")?
 					.context("Unable to read from password file")?
-                    } else {
-                        unreachable!()
-                    }
-                };
+			} else if matches.is_present("password-command") {
+				let shell = std::env::var("SHELL").context("Could not determine current shell")?;
+				String::from_utf8(
+					std::process::Command::new(shell)
+						.arg("-c")
+						.arg(matches.value_of("password-command").unwrap())
+						.output()
+						.context("Failed to execute password command")?
+						.stdout,
+				)
+				.context("Password command returned invalid characters")?
+			} else {
+				unreachable!()
+			}
+		};
 		password.retain(|c| c >= '0' && c <= '9');
 		let password = password.as_bytes().to_vec();
 
