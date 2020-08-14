@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Context;
 use std::io::Write;
+use log::{info, debug};
 
 /// Write raw backup
 ///
@@ -23,6 +24,8 @@ impl Output {
 	///
 	/// `force_write` determines whether existing files will be overwritten.
 	pub fn new(path: &std::path::Path, force_write: bool) -> Result<Self, anyhow::Error> {
+                info!("Output path: {}", &path.to_string_lossy());
+
 		// check output path
 		if !force_write && path.exists() {
 			return Err(anyhow!(
@@ -87,6 +90,8 @@ impl Output {
 		{
 			return Ok(());
 		}
+
+                debug!("Write statement: {}", &statement);
 
 		let mut stmt = self
 			.sqlite_connection

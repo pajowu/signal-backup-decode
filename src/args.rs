@@ -1,5 +1,6 @@
 // imports
 use anyhow::Context;
+use anyhow::anyhow;
 use clap::{crate_authors, crate_description, crate_name, crate_version};
 use std::io::BufRead;
 
@@ -41,6 +42,14 @@ impl Config {
 					.value_name("FOLDER"),
 			)
 			.arg(
+				clap::Arg::with_name("log-level")
+					.help("Verbosity level, either DEBUG, INFO, WARN, or ERROR")
+					.long("log-level")
+					.short("l")
+					.takes_value(true)
+					.value_name("LEVEL"),
+			)
+			.arg(
 				clap::Arg::with_name("no-verify-mac")
 					.help("Do not verify the HMAC of each frame in the backup")
 					.long("no-verify-mac"),
@@ -76,8 +85,10 @@ impl Config {
 			)
 			.get_matches();
 
+                // input file handling
 		let input_file = std::path::PathBuf::from(matches.value_of("input-file").unwrap());
 
+                // output path handling
 		// TODO add force / overwrite CLI argument instead of default overwriting?
 		let output_path = std::path::PathBuf::from(matches.value_of("output-path").unwrap_or({
 			input_file
@@ -87,6 +98,7 @@ impl Config {
 				.context("output-path is not given and path to input file could not be read.")?
 		}));
 
+                // password handling
 		let mut password = {
 			if matches.is_present("password-string") {
 				String::from(matches.value_of("password-string").unwrap())
@@ -118,12 +130,25 @@ impl Config {
 		password.retain(|c| c >= '0' && c <= '9');
 		let password = password.as_bytes().to_vec();
 
+                // verbosity handling
+                let log_level = if let Some(x) = matches.value_of("log-level") {
+                    match x.to_lowercase().as_str() {
+                        "debug" => log::LevelFilter::Debug,
+                        "info" => log::LevelFilter::Info,
+                        "warn" => log::LevelFilter::Warn,
+                        "error" => log::LevelFilter::Error,
+                        _ => return Err(anyhow!("Unknown log level given")),
+                    }
+                } else {
+                    log::LevelFilter::Info
+                };
+
 		Ok(Self {
 			path_input: input_file,
 			path_output: output_path,
 			password,
 			verify_mac: !matches.is_present("no_verify_mac"),
-			log_level: log::LevelFilter::Info,
+			log_level,
 		})
 	}
 }
