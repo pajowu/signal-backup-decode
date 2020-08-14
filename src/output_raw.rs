@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Context;
+use log::{debug, info};
 use std::io::Write;
-use log::{info, debug};
 
 /// Write raw backup
 ///
@@ -13,68 +13,56 @@ pub struct Output {
 	path_sticker: std::path::PathBuf,
 	path_config: std::path::PathBuf,
 	sqlite_connection: rusqlite::Connection,
-	count_attachment: usize,
 	count_sticker: usize,
 	count_avatar: usize,
 	written_frames: usize,
+	force_overwrite: bool,
 }
 
 impl Output {
 	/// Creates new output object
 	///
 	/// `force_write` determines whether existing files will be overwritten.
-	pub fn new(path: &std::path::Path, force_write: bool) -> Result<Self, anyhow::Error> {
-                info!("Output path: {}", &path.to_string_lossy());
+	pub fn new(path: &std::path::Path, force_overwrite: bool) -> Result<Self, anyhow::Error> {
+		info!("Output path: {}", &path.to_string_lossy());
 
-		// check output path
-		if !force_write && path.exists() {
-			return Err(anyhow!(
-				"{} already exists and should not be overwritten",
-				path.to_string_lossy()
-			));
-		}
-
-		if path.exists() && !path.is_dir() {
-			return Err(anyhow!(
-				"{} exists and is not a directory",
-				path.to_string_lossy()
-			));
-		}
-
-		if !path.exists() {
-			std::fs::create_dir(&path)
-				.with_context(|| format!("{} could not be created", path.to_string_lossy()))?;
-		}
+		Output::set_directory(&path, "", force_overwrite)?;
 
 		// determine sqlite path
 		let path_sqlite = path.join("signal_backup.db");
 
 		if path_sqlite.exists() {
-			std::fs::remove_file(&path_sqlite).with_context(|| {
-				format!(
-					"could not delete old database: {}",
-					path_sqlite.to_string_lossy()
-				)
-			})?;
+			if force_overwrite {
+				std::fs::remove_file(&path_sqlite).with_context(|| {
+					format!(
+						"could not delete old database: {}",
+						path_sqlite.to_string_lossy()
+					)
+				})?;
+			} else {
+				return Err(anyhow!(
+					"Backup database already exists and should not be overwritten. Try -f"
+				));
+			}
 		}
 
 		Ok(Self {
-			path_avatar: Output::set_directory(&path, "avatar")?,
-			path_attachment: Output::set_directory(&path, "attachment")?,
-			path_sticker: Output::set_directory(&path, "sticker")?,
-			path_config: Output::set_directory(&path, "config")?,
+			path_avatar: Output::set_directory(&path, "avatar", force_overwrite)?,
+			path_attachment: Output::set_directory(&path, "attachment", force_overwrite)?,
+			path_sticker: Output::set_directory(&path, "sticker", force_overwrite)?,
+			path_config: Output::set_directory(&path, "config", force_overwrite)?,
 			sqlite_connection: rusqlite::Connection::open(&path_sqlite).with_context(|| {
 				format!(
 					"could not open connection to database file: {}.",
 					path_sqlite.to_string_lossy()
 				)
 			})?,
-			count_attachment: 0,
 			count_sticker: 0,
 			count_avatar: 0,
 			// we set 2 read frames in the beginning because we have 1) a header frame
 			// and 2) a version frame we do not count in written frames.
 			written_frames: 2,
+			force_overwrite,
 		})
 	}
 
@@ -91,7 +79,7 @@ impl Output {
 			return Ok(());
 		}
 
-                debug!("Write statement: {}", &statement);
+		debug!("Write statement: {}", &statement);
 
 		let mut stmt = self
 			.sqlite_connection
@@ -111,21 +99,12 @@ impl Output {
 		attachmend_id: u64,
 		row_id: u64,
 	) -> Result<(), anyhow::Error> {
+		// TODO determine mime type of attachment
 		let path = self
 			.path_attachment
 			.join(format!("{}_{}", attachmend_id, row_id));
-		let mut buffer = std::fs::File::create(&path).with_context(|| {
-			format!("Failed to open attachment file: {}", path.to_string_lossy())
-		})?;
+		self.write_to_file(&path, &data)?;
 
-		buffer.write_all(data).with_context(|| {
-			format!(
-				"Failed to write to attachment file: {}",
-				path.to_string_lossy()
-			)
-		})?;
-
-		self.count_attachment += 1;
 		self.written_frames += 1;
 
 		Ok(())
@@ -140,18 +119,8 @@ impl Output {
 		let path = self
 			.path_sticker
 			.join(format!("{}_{}", row_id, self.count_sticker));
-		let mut buffer = std::fs::File::create(&path).with_context(|| {
-			format!("Failed to open attachment file: {}", path.to_string_lossy())
-		})?;
+		self.write_to_file(&path, &data)?;
 
-		buffer.write_all(data).with_context(|| {
-			format!(
-				"Failed to write to attachment file: {}",
-				path.to_string_lossy()
-			)
-		})?;
-
-		self.count_attachment += 1;
 		self.count_sticker += 1;
 		self.written_frames += 1;
 
@@ -167,18 +136,8 @@ impl Output {
 		let path = self
 			.path_avatar
 			.join(format!("{}_{}", name, self.count_avatar));
-		let mut buffer = std::fs::File::create(&path).with_context(|| {
-			format!("Failed to open attachment file: {}", path.to_string_lossy())
-		})?;
+		self.write_to_file(&path, &data)?;
 
-		buffer.write_all(data).with_context(|| {
-			format!(
-				"Failed to write to attachment file: {}",
-				path.to_string_lossy()
-			)
-		})?;
-
-		self.count_attachment += 1;
 		self.count_avatar += 1;
 		self.written_frames += 1;
 
@@ -229,20 +188,53 @@ impl Output {
 		self.written_frames
 	}
 
+	fn write_to_file(&self, path: &std::path::Path, data: &[u8]) -> Result<(), anyhow::Error> {
+		if path.exists() && !self.force_overwrite {
+			return Err(anyhow!(
+				"File already exists and should not be overwritten: {}",
+				path.to_string_lossy()
+			));
+		}
+
+		let mut buffer = std::fs::File::create(&path).with_context(|| {
+			format!("Failed to open attachment file: {}", path.to_string_lossy())
+		})?;
+
+		buffer.write_all(data).with_context(|| {
+			format!(
+				"Failed to write to attachment file: {}",
+				path.to_string_lossy()
+			)
+		})?;
+
+		Ok(())
+	}
+
 	fn set_directory(
 		base: &std::path::Path,
 		name: &str,
+		force_overwrite: bool,
 	) -> Result<std::path::PathBuf, anyhow::Error> {
 		let folder = base.join(name);
 
-		if !folder.exists() {
-			std::fs::create_dir(&folder)
-				.with_context(|| format!("{} could not be created.", folder.to_string_lossy()))?;
-		} else if !folder.is_dir() {
+		// check output path
+		if !force_overwrite && folder.exists() {
 			return Err(anyhow!(
-				"{} exists and is not a directory.",
+				"{} already exists and should not be overwritten. Try -f",
 				folder.to_string_lossy()
 			));
+		}
+
+		if folder.exists() && !folder.is_dir() {
+			return Err(anyhow!(
+				"{} exists and is not a directory",
+				folder.to_string_lossy()
+			));
+		}
+
+		if !folder.exists() {
+			std::fs::create_dir(&folder)
+				.with_context(|| format!("{} could not be created", folder.to_string_lossy()))?;
 		}
 
 		Ok(folder)

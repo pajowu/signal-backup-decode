@@ -14,7 +14,7 @@ mod output_raw;
 
 fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	// output
-	let mut output = output_raw::Output::new(&config.path_output, true)?;
+	let mut output = output_raw::Output::new(&config.path_output, config.force_overwrite)?;
 
 	// input
 	let mut reader =
@@ -24,10 +24,10 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	let progress = std::sync::Arc::new(display::Progress::new(
 		reader.get_file_size(),
 		reader.get_count_frame().try_into().unwrap(),
-                // don't print progress bars as they are overwritten by debug messages
-                // this implies that only messages of level debug are allowed as long as bars are
-                // active
-                config.log_level == log::Level::Debug,
+		// don't print progress bars as they are overwritten by debug messages
+		// this implies that only messages of level debug are allowed as long as bars are
+		// active
+		config.log_level == log::Level::Debug,
 	));
 	let progress_read = progress.clone();
 	let progress_write = progress.clone();

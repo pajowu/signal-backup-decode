@@ -1,9 +1,9 @@
 use anyhow::anyhow;
 use anyhow::Context;
 use byteorder::ReadBytesExt;
+use log::info;
 use std::convert::TryInto;
 use std::io::Read;
-use log::info;
 
 /// Read input file
 pub struct InputFile {
@@ -21,7 +21,7 @@ impl InputFile {
 		verify_mac: bool,
 	) -> Result<Self, anyhow::Error> {
 		// open file
-                info!("Input file: {}", &path.to_string_lossy());
+		info!("Input file: {}", &path.to_string_lossy());
 		let file = std::fs::File::open(path)
 			.with_context(|| format!("Could not open backup file: {}", path.to_string_lossy()))?;
 		let file_bytes = file.metadata().unwrap().len();

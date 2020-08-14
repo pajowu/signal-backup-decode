@@ -1,6 +1,6 @@
 // imports
-use anyhow::Context;
 use anyhow::anyhow;
+use anyhow::Context;
 use clap::{crate_authors, crate_description, crate_name, crate_version};
 use std::io::BufRead;
 
@@ -9,18 +9,24 @@ use std::io::BufRead;
 /// Stores all global variables
 #[derive(Debug)]
 pub struct Config {
+	/// Path to input file
 	pub path_input: std::path::PathBuf,
+	/// Path to output directory. If not given is automatically determined from input path.
 	pub path_output: std::path::PathBuf,
+	/// Password to open backup file
 	pub password: Vec<u8>,
+	/// Should HMAC be verified?
 	pub verify_mac: bool,
+	/// Log / verbosity level
 	pub log_level: log::LevelFilter,
+	/// Overwrite existing output files?
+	pub force_overwrite: bool,
 }
 
 impl Config {
 	/// Create new config object
 	pub fn new() -> Result<Self, anyhow::Error> {
 		// TODO add check argument
-		// TODO add verbosity argument
 		let matches = clap::App::new(crate_name!())
 			.version(crate_version!())
 			.about(crate_description!())
@@ -50,6 +56,12 @@ impl Config {
 					.value_name("LEVEL"),
 			)
 			.arg(
+				clap::Arg::with_name("force-overwrite")
+					.help("Overwrite existing output files")
+					.long("force")
+					.short("f"),
+			)
+			.arg(
 				clap::Arg::with_name("no-verify-mac")
 					.help("Do not verify the HMAC of each frame in the backup")
 					.long("no-verify-mac"),
@@ -66,7 +78,6 @@ impl Config {
 				clap::Arg::with_name("password-file")
 					.help("File to read the backup password from")
 					.long("password-file")
-					.short("f")
 					.takes_value(true)
 					.value_name("FILE"),
 			)
@@ -85,10 +96,10 @@ impl Config {
 			)
 			.get_matches();
 
-                // input file handling
+		// input file handling
 		let input_file = std::path::PathBuf::from(matches.value_of("input-file").unwrap());
 
-                // output path handling
+		// output path handling
 		// TODO add force / overwrite CLI argument instead of default overwriting?
 		let output_path = std::path::PathBuf::from(matches.value_of("output-path").unwrap_or({
 			input_file
@@ -98,7 +109,7 @@ impl Config {
 				.context("output-path is not given and path to input file could not be read.")?
 		}));
 
-                // password handling
+		// password handling
 		let mut password = {
 			if matches.is_present("password-string") {
 				String::from(matches.value_of("password-string").unwrap())
@@ -130,18 +141,18 @@ impl Config {
 		password.retain(|c| c >= '0' && c <= '9');
 		let password = password.as_bytes().to_vec();
 
-                // verbosity handling
-                let log_level = if let Some(x) = matches.value_of("log-level") {
-                    match x.to_lowercase().as_str() {
-                        "debug" => log::LevelFilter::Debug,
-                        "info" => log::LevelFilter::Info,
-                        "warn" => log::LevelFilter::Warn,
-                        "error" => log::LevelFilter::Error,
-                        _ => return Err(anyhow!("Unknown log level given")),
-                    }
-                } else {
-                    log::LevelFilter::Info
-                };
+		// verbosity handling
+		let log_level = if let Some(x) = matches.value_of("log-level") {
+			match x.to_lowercase().as_str() {
+				"debug" => log::LevelFilter::Debug,
+				"info" => log::LevelFilter::Info,
+				"warn" => log::LevelFilter::Warn,
+				"error" => log::LevelFilter::Error,
+				_ => return Err(anyhow!("Unknown log level given")),
+			}
+		} else {
+			log::LevelFilter::Info
+		};
 
 		Ok(Self {
 			path_input: input_file,
@@ -149,6 +160,7 @@ impl Config {
 			password,
 			verify_mac: !matches.is_present("no_verify_mac"),
 			log_level,
+			force_overwrite: matches.is_present("force-overwrite"),
 		})
 	}
 }

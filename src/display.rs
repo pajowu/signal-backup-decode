@@ -15,18 +15,18 @@ impl Progress {
                     .progress_chars("#>-");
 
 		let bar_multi = indicatif::MultiProgress::new();
-                let bar_bytes; 
-                let bar_frames;
+		let bar_bytes;
+		let bar_frames;
 
-                if hidden {
-                    bar_bytes = None;
-                    bar_frames = None;
-                } else {
-                    bar_bytes = Some(bar_multi.add(indicatif::ProgressBar::new(bytes_to_read)));
-                    bar_bytes.as_ref().unwrap().set_style(sty_bytes);
-                    bar_frames = Some(bar_multi.add(indicatif::ProgressBar::new(frames_to_read)));
-                    bar_frames.as_ref().unwrap().set_style(sty_frames);
-                }
+		if hidden {
+			bar_bytes = None;
+			bar_frames = None;
+		} else {
+			bar_bytes = Some(bar_multi.add(indicatif::ProgressBar::new(bytes_to_read)));
+			bar_bytes.as_ref().unwrap().set_style(sty_bytes);
+			bar_frames = Some(bar_multi.add(indicatif::ProgressBar::new(frames_to_read)));
+			bar_frames.as_ref().unwrap().set_style(sty_frames);
+		}
 
 		Self {
 			bar_multi,
