@@ -99,7 +99,6 @@ impl Output {
 		attachmend_id: u64,
 		row_id: u64,
 	) -> Result<(), anyhow::Error> {
-		// TODO determine mime type of attachment
 		let path = self
 			.path_attachment
 			.join(format!("{}_{}", attachmend_id, row_id));
@@ -189,6 +188,13 @@ impl Output {
 	}
 
 	fn write_to_file(&self, path: &std::path::Path, data: &[u8]) -> Result<(), anyhow::Error> {
+		// determine mime type
+		let infer = infer::Infer::new();
+		let mut path = path.to_path_buf();
+		if let Some(x) = infer.get(&data) {
+			path.set_extension(x.ext);
+		}
+
 		if path.exists() && !self.force_overwrite {
 			return Err(anyhow!(
 				"File already exists and should not be overwritten: {}",

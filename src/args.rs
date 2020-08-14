@@ -100,7 +100,6 @@ impl Config {
 		let input_file = std::path::PathBuf::from(matches.value_of("input-file").unwrap());
 
 		// output path handling
-		// TODO add force / overwrite CLI argument instead of default overwriting?
 		let output_path = std::path::PathBuf::from(matches.value_of("output-path").unwrap_or({
 			input_file
 				.file_stem()

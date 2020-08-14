@@ -36,23 +36,33 @@ impl Progress {
 	}
 
 	pub fn set_read_frames(&self, length: u64) {
-		if let Some(ref x) = self.bar_frames { x.set_length(length) };
+		if let Some(ref x) = self.bar_frames {
+			x.set_length(length)
+		};
 	}
 
 	pub fn set_written_frames(&self, length: u64) {
-		if let Some(ref x) = self.bar_frames { x.set_position(length) };
+		if let Some(ref x) = self.bar_frames {
+			x.set_position(length)
+		};
 	}
 
 	pub fn set_read_bytes(&self, length: u64) {
-		if let Some(ref x) = self.bar_bytes { x.set_position(length) };
+		if let Some(ref x) = self.bar_bytes {
+			x.set_position(length)
+		};
 	}
 
 	pub fn finish_frames(&self) {
-		if let Some(ref x) = self.bar_frames { x.finish() };
+		if let Some(ref x) = self.bar_frames {
+			x.finish()
+		};
 	}
 
 	pub fn finish_bytes(&self) {
-		if let Some(ref x) = self.bar_bytes { x.finish() };
+		if let Some(ref x) = self.bar_bytes {
+			x.finish()
+		};
 	}
 
 	pub fn finish_all(&self) {

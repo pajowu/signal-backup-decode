@@ -24,7 +24,8 @@ hmac = "^0.8"
 aes-ctr = "^0.4"
 generic-array = "^0.14"
 subtle = "^2.2"
-indicatif = "0.15.0"
+indicatif = "^0.15.0"
+infer = "^0.2.3"
 
 [build-dependencies]
 protoc-rust = {version = "^2.14", optional = true}
