@@ -7,7 +7,6 @@ use std::io::BufRead;
 /// Config struct
 ///
 /// Stores all global variables
-#[derive(Debug)]
 pub struct Config {
 	/// Path to input file
 	pub path_input: std::path::PathBuf,
@@ -21,12 +20,13 @@ pub struct Config {
 	pub log_level: log::LevelFilter,
 	/// Overwrite existing output files?
 	pub force_overwrite: bool,
+	/// Output type
+	pub output_type: crate::output::SignalOutputType,
 }
 
 impl Config {
 	/// Create new config object
 	pub fn new() -> Result<Self, anyhow::Error> {
-		// TODO add check argument
 		let matches = clap::App::new(crate_name!())
 			.version(crate_version!())
 			.about(crate_description!())
@@ -46,6 +46,14 @@ impl Config {
 					.short("o")
 					.takes_value(true)
 					.value_name("FOLDER"),
+			)
+			.arg(
+				clap::Arg::with_name("output-type")
+					.help("Output type, either RAW or NONE")
+					.long("output-type")
+					.short("t")
+					.takes_value(true)
+					.value_name("TYPE"),
 			)
 			.arg(
 				clap::Arg::with_name("log-level")
@@ -153,6 +161,17 @@ impl Config {
 			log::LevelFilter::Info
 		};
 
+		// determine output type
+		let output_type = if let Some(x) = matches.value_of("output-type") {
+			match x.to_lowercase().as_str() {
+				"none" => crate::output::SignalOutputType::None,
+				"raw" => crate::output::SignalOutputType::Raw,
+				_ => return Err(anyhow!("Unknown output type given")),
+			}
+		} else {
+			crate::output::SignalOutputType::Raw
+		};
+
 		Ok(Self {
 			path_input: input_file,
 			path_output: output_path,
@@ -160,6 +179,7 @@ impl Config {
 			verify_mac: !matches.is_present("no_verify_mac"),
 			log_level,
 			force_overwrite: matches.is_present("force-overwrite"),
+			output_type,
 		})
 	}
 }
