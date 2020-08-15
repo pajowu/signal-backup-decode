@@ -84,15 +84,12 @@ impl Decrypter {
 
 	// TODO what is happening here?
 	pub fn increase_iv(&mut self) {
-		let mut i = 3;
-
-		loop {
-			if self.iv[i] < 255 {
-				self.iv[i] += 1;
+                for v in self.iv.iter_mut().take(4).rev() {
+			if *v < u8::MAX {
+				*v += 1;
 				break;
 			} else {
-				self.iv[i] = 0;
-				i -= 1;
+				*v = 0;
 			}
 		}
 
