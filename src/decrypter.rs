@@ -84,21 +84,64 @@ impl Decrypter {
 
 	// TODO what is happening here?
 	pub fn increase_iv(&mut self) {
-		let mut i = 3;
-
-		loop {
-			if self.iv[i] < 255 {
-				self.iv[i] += 1;
+                for v in self.iv.iter_mut().take(4).rev() {
+			if *v < u8::MAX {
+				*v += 1;
 				break;
 			} else {
-				self.iv[i] = 0;
-				i -= 1;
+				*v = 0;
 			}
-		}
+                }
 
 		self.cipher = aes_ctr::Aes256Ctr::new(
 			generic_array::GenericArray::from_slice(&self.key),
 			generic_array::GenericArray::from_slice(&self.iv),
 		);
+	}
+}
+
+#[cfg(test)]
+mod tests {
+        use aes_ctr::stream_cipher::NewStreamCipher;
+	use super::*;
+
+	#[test]
+	fn increase_iv() {
+                let key = [0; 32];
+                let mut iv = vec![0; 16];
+
+                // test increase at position 3
+		let mut dec = Decrypter {
+			mac: None,
+			cipher: aes_ctr::Aes256Ctr::new(
+                            &generic_array::GenericArray::from_slice(&key),
+                            &generic_array::GenericArray::from_slice(&iv),
+			),
+			key: key.to_vec(),
+			iv: iv.to_vec(),
+		};
+		dec.increase_iv();
+
+                iv[3] = 1;
+                assert_eq!(dec.iv, iv);
+
+                // test increase switch of increased positions
+                iv[3] = 255;
+                iv[2] = 255;
+		let mut dec = Decrypter {
+			mac: None,
+			cipher: aes_ctr::Aes256Ctr::new(
+                            &generic_array::GenericArray::from_slice(&key),
+                            &generic_array::GenericArray::from_slice(&iv),
+			),
+			key: key.to_vec(),
+			iv: iv.to_vec(),
+		};
+		dec.increase_iv();
+
+                iv[3] = 0;
+                iv[2] = 0;
+                iv[1] = 1;
+                assert_eq!(dec.iv, iv);
 	}
 }
