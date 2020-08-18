@@ -21,10 +21,10 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 		input::InputFile::new(&config.path_input, &config.password, config.verify_mac)?;
 
 	// progress bar
-	let progress = std::sync::Arc::new(display::Progress::new(
+	let progress = display::Progress::new(
 		reader.get_file_size(),
 		reader.get_count_frame().try_into().unwrap(),
-	));
+	);
 	let progress_read = progress.clone();
 	let progress_write = progress.clone();
 
@@ -72,19 +72,25 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 		Ok(())
 	});
 
-	let thread_output = std::thread::spawn(move || -> Result<(), anyhow::Error> {
+	let thread_output = std::thread::spawn(move || {
 		for received in frame_rx {
-			output.write_frame(received)?;
-			progress_write.set_written_frames(output.get_written_frames().try_into().unwrap());
+			match output.write_frame(received) {
+				Ok(_) => progress_write
+					.set_written_frames(output.get_written_frames().try_into().unwrap()),
+				Err(e) => {
+					progress_write.bar_frames.finish_at_current_pos();
+					error!("{}.", e);
+					return;
+				}
+			}
 		}
 
 		progress_write.finish_frames();
-		Ok(())
 	});
 
 	progress.finish_all();
 	thread_input.join().unwrap()?;
-	thread_output.join().unwrap()?;
+	thread_output.join().unwrap();
 
 	Ok(())
 }

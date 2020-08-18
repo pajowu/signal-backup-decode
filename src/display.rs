@@ -1,8 +1,9 @@
 /// Dispaly a progress bar
+#[derive(Clone)]
 pub struct Progress {
-	bar_multi: indicatif::MultiProgress,
-	bar_bytes: indicatif::ProgressBar,
-	bar_frames: indicatif::ProgressBar,
+	bar_multi: std::sync::Arc<indicatif::MultiProgress>,
+	pub bar_bytes: indicatif::ProgressBar,
+	pub bar_frames: indicatif::ProgressBar,
 }
 
 impl Progress {
@@ -21,7 +22,7 @@ impl Progress {
 		bar_frames.set_style(sty_frames);
 
 		Self {
-			bar_multi: multi,
+			bar_multi: std::sync::Arc::new(multi),
 			bar_bytes,
 			bar_frames,
 		}
