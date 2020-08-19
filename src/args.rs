@@ -58,8 +58,8 @@ impl Config {
 			.arg(
 				clap::Arg::with_name("log-level")
 					.help("Verbosity level, either DEBUG, INFO, WARN, or ERROR")
-					.long("log-level")
-					.short("l")
+					.long("verbosity")
+					.short("v")
 					.takes_value(true)
 					.value_name("LEVEL"),
 			)

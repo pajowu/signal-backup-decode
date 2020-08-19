@@ -145,3 +145,14 @@ impl Frame {
 		}
 	}
 }
+
+impl std::fmt::Display for Frame {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Header { salt, iv } => {
+                write!(f, "Salt: {:X?} (length: {}), IV: {:X?} (length: {})", salt, salt.len(), iv, iv.len())
+            }
+            _ => Ok(())
+        }
+    }
+}

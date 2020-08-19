@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Context;
 use byteorder::ReadBytesExt;
-use log::info;
+use log::{debug, info};
 use std::convert::TryInto;
 use std::io::Read;
 
@@ -42,14 +42,17 @@ impl InputFile {
 		let frame = crate::frame::Frame::new(&mut frame);
 
 		// check that frame is a header and return
-		match frame {
-			crate::frame::Frame::Header { salt, iv } => Ok(Self {
-				reader,
-				decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
-				count_frame: 1,
-				count_byte: len,
-				file_bytes,
-			}),
+		match &frame {
+			crate::frame::Frame::Header { salt, iv } => {
+				debug!("Found header: {}", &frame);
+				Ok(Self {
+					reader,
+					decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
+					count_frame: 1,
+					count_byte: len,
+					file_bytes,
+				})
+			}
 			_ => Err(anyhow!("first frame is not a header")),
 		}
 	}
