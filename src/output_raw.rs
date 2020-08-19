@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use anyhow::Context;
+use log::info;
 use std::io::Write;
 
 /// Write raw backup
@@ -69,9 +70,8 @@ impl Output {
 			count_attachment: 0,
 			count_sticker: 0,
 			count_avatar: 0,
-			// we set 2 read frames in the beginning because we have 1) a header frame
-			// and 2) a version frame we do not count in written frames.
-			written_frames: 2,
+			// we set read frames to 1 due to the header frame we will never write
+			written_frames: 1,
 		})
 	}
 
@@ -200,6 +200,12 @@ impl Output {
 		Ok(())
 	}
 
+	pub fn write_version(&mut self, version: u32) -> Result<(), anyhow::Error> {
+		info!("Database Version: {:?}", version);
+		self.written_frames += 1;
+		Ok(())
+	}
+
 	pub fn write_frame(&mut self, frame: crate::frame::Frame) -> Result<(), anyhow::Error> {
 		match frame {
 			crate::frame::Frame::Statement {
@@ -216,6 +222,7 @@ impl Output {
 			crate::frame::Frame::Sticker { row, data, .. } => {
 				self.write_sticker(data.as_ref().unwrap(), row)
 			}
+			crate::frame::Frame::Version { version } => self.write_version(version),
 			_ => Err(anyhow!("unexpected frame found")),
 		}
 	}

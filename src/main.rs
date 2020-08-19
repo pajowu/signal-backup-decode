@@ -32,44 +32,29 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	// and to display correct status
 	let (frame_tx, frame_rx) = std::sync::mpsc::sync_channel(10);
 
-	let thread_input = std::thread::spawn(move || -> Result<(), anyhow::Error> {
-		loop {
-			let frame = reader.read_frame()?;
-			let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame)
-				.with_context(|| format!("Could not parse frame from {:?}", frame))?;
-			let mut frame = crate::frame::Frame::new(&mut frame);
-
+	let thread_input = std::thread::spawn(move || {
+		while let Some(frame) = reader.next() {
 			match frame {
-				frame::Frame::Version { version } => {
-					info!("Database Version: {:?}", version);
+				Ok(x) => {
+					// if we cannot send a frame, probably an error has occured in the
+					// output thread. Thus, just shut down the input thread. We will print
+					// the error in the output thread.
+					if let Err(_) = frame_tx.send(x) {
+						break;
+					}
+
+					// forward progress bar if everything is ok
+					progress_read.set_read_frames(reader.get_count_frame().try_into().unwrap());
+					progress_read.set_read_bytes(reader.get_count_byte().try_into().unwrap());
 				}
-				frame::Frame::Attachment { data_length, .. } => {
-					frame.set_data(reader.read_data(data_length)?);
-					frame_tx.send(frame).unwrap();
-				}
-				frame::Frame::Avatar { data_length, .. } => {
-					frame.set_data(reader.read_data(data_length)?);
-					frame_tx.send(frame).unwrap();
-				}
-				frame::Frame::Sticker { data_length, .. } => {
-					frame.set_data(reader.read_data(data_length)?);
-					frame_tx.send(frame).unwrap();
-				}
-				frame::Frame::Header { .. } => return Err(anyhow!("unexpected header found")),
-				frame::Frame::End => {
+				Err(e) => {
+					error!("{}.", e);
 					break;
 				}
-				_ => {
-					frame_tx.send(frame).unwrap();
-				}
-			};
-
-			progress_read.set_read_frames(reader.get_count_frame().try_into().unwrap());
-			progress_read.set_read_bytes(reader.get_count_byte().try_into().unwrap());
+			}
 		}
 
-		progress_read.finish_bytes();
-		Ok(())
+		progress_read.bar_bytes.finish_at_current_pos();
 	});
 
 	let thread_output = std::thread::spawn(move || {
@@ -78,18 +63,17 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 				Ok(_) => progress_write
 					.set_written_frames(output.get_written_frames().try_into().unwrap()),
 				Err(e) => {
-					progress_write.bar_frames.finish_at_current_pos();
 					error!("{}.", e);
-					return;
+					break;
 				}
 			}
 		}
 
-		progress_write.finish_frames();
+		progress_write.bar_frames.finish_at_current_pos();
 	});
 
 	progress.finish_all();
-	thread_input.join().unwrap()?;
+	thread_input.join().unwrap();
 	thread_output.join().unwrap();
 
 	Ok(())
