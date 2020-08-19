@@ -34,12 +34,9 @@ impl InputFile {
 			.unwrap()
 			.try_into()
 			.unwrap();
-		let mut frame_content = vec![0u8; len];
-		reader.read_exact(&mut frame_content)?;
-		let mut frame =
-			protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
-				.with_context(|| format!("Could not parse frame from {:?}", frame_content))?;
-		let frame = crate::frame::Frame::new(&mut frame);
+		let mut frame = vec![0u8; len];
+		reader.read_exact(&mut frame)?;
+		let frame: crate::frame::Frame = frame.try_into()?;
 
 		// check that frame is a header and return
 		match &frame {
@@ -76,7 +73,13 @@ impl InputFile {
 		self.decrypter.verify_mac(&hmac)?;
 		self.decrypter.increase_iv();
 
-		self.count_byte += length;
+                if !read_attachment {
+                    // we add 4 bytes to take read frame length into account
+                    self.count_byte += length + (u32::MAX / u8::MAX as u32) as usize;
+                } else {
+                    // we haven't read frame length here, so we don't need it!
+                    self.count_byte += length;
+                }
 		Ok(data)
         }
 
@@ -88,6 +91,7 @@ impl InputFile {
 			.unwrap()
 			.try_into()
 			.unwrap();
+                debug!("Read frame number {} with length {} (bytes)", self.count_frame, len);
 
 		// create frame
                 let frame = self.read_data(len, false)?;
@@ -109,7 +113,6 @@ impl InputFile {
 
 		// clean up and return
 		self.count_frame += 1;
-		self.count_byte += len;
 		Ok(frame)
 	}
 

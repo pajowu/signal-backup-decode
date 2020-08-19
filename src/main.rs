@@ -8,6 +8,7 @@ mod display;
 mod frame;
 mod input;
 mod output;
+mod output_csv;
 mod output_none;
 mod output_raw;
 
@@ -21,6 +22,7 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 			&config.path_output,
 			config.force_overwrite,
 		)?),
+		crate::output::SignalOutputType::Csv => Box::new(crate::output_csv::SignalOutputCsv::new())
 	};
 
 	// input

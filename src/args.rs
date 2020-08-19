@@ -49,7 +49,7 @@ impl Config {
 			)
 			.arg(
 				clap::Arg::with_name("output-type")
-					.help("Output type, either RAW or NONE")
+					.help("Output type, either RAW, CSV or NONE")
 					.long("output-type")
 					.short("t")
 					.takes_value(true)
@@ -166,6 +166,7 @@ impl Config {
 			match x.to_lowercase().as_str() {
 				"none" => crate::output::SignalOutputType::None,
 				"raw" => crate::output::SignalOutputType::Raw,
+				"csv" => crate::output::SignalOutputType::Csv,
 				_ => return Err(anyhow!("Unknown output type given")),
 			}
 		} else {

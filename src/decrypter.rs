@@ -1,6 +1,5 @@
 use aes_ctr::stream_cipher::NewStreamCipher;
 use aes_ctr::stream_cipher::SyncStreamCipher;
-use anyhow::anyhow;
 use hmac::crypto_mac::Mac;
 use hmac::crypto_mac::NewMac;
 use sha2::Digest;
@@ -66,7 +65,7 @@ impl Decrypter {
 		}
 	}
 
-	pub fn verify_mac(&mut self, hmac_control: &[u8]) -> Result<(), anyhow::Error> {
+	pub fn verify_mac(&mut self, hmac_control: &[u8]) -> Result<(), DecryptError> {
 		if let Some(ref mut hmac) = self.mac {
 			let result = hmac.finalize_reset();
 			let code_bytes = &result.into_bytes()[..10];
@@ -75,7 +74,10 @@ impl Decrypter {
 			let result = code_bytes.ct_eq(&hmac_control);
 
 			if result.unwrap_u8() == 0 {
-				return Err(anyhow!("HMAC verification failed"));
+				return Err(DecryptError::MacVerificationFailed {
+					their_mac: hmac_control.to_vec(),
+					our_mac: code_bytes.to_vec(),
+				});
 			}
 		}
 
@@ -97,6 +99,28 @@ impl Decrypter {
 			generic_array::GenericArray::from_slice(&self.key),
 			generic_array::GenericArray::from_slice(&self.iv),
 		);
+	}
+}
+
+#[derive(Debug)]
+pub enum DecryptError {
+	MacVerificationFailed {
+		their_mac: Vec<u8>,
+		our_mac: Vec<u8>,
+	},
+}
+
+impl std::error::Error for DecryptError {}
+
+impl std::fmt::Display for DecryptError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::MacVerificationFailed { their_mac, our_mac } => write!(
+				f,
+				"HMAC verification failed (their mac: {:02X?}, our mac: {:02X?})",
+				their_mac, our_mac
+			),
+		}
 	}
 }
 
