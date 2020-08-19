@@ -1,7 +1,4 @@
-use anyhow::anyhow;
-use anyhow::Context;
 use log::error;
-use log::info;
 use std::convert::TryInto;
 
 mod Backups;
@@ -31,14 +28,14 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 		input::InputFile::new(&config.path_input, &config.password, config.verify_mac)?;
 
 	// progress bar
-	let progress = std::sync::Arc::new(display::Progress::new(
+	let progress = display::Progress::new(
 		reader.get_file_size(),
 		reader.get_count_frame().try_into().unwrap(),
 		// don't print progress bars as they are overwritten by debug messages
 		// this implies that only messages of level debug are allowed as long as bars are
 		// active
 		config.log_level == log::Level::Debug,
-	));
+	);
 	let progress_read = progress.clone();
 	let progress_write = progress.clone();
 
@@ -47,39 +44,28 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	let (frame_tx, frame_rx) = std::sync::mpsc::sync_channel(10);
 
 	let thread_input = std::thread::spawn(move || -> Result<(), anyhow::Error> {
-		loop {
-			let frame = reader.read_frame()?;
-			let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame)
-				.with_context(|| format!("Could not parse frame from {:?}", frame))?;
-			let mut frame = crate::frame::Frame::new(&mut frame);
-
+		// we have to use a while let loop here because we want to access the reader object
+		// in the loop. This does not work with a simple for loop.
+		#[allow(clippy::while_let_on_iterator)]
+		while let Some(frame) = reader.next() {
 			match frame {
-				frame::Frame::Version { version } => {
-					info!("Database Version: {:?}", version);
-				}
-				frame::Frame::Attachment { data_length, .. } => {
-					frame.set_data(reader.read_data(data_length)?);
-					frame_tx.send(frame).unwrap();
-				}
-				frame::Frame::Avatar { data_length, .. } => {
-					frame.set_data(reader.read_data(data_length)?);
-					frame_tx.send(frame).unwrap();
-				}
-				frame::Frame::Sticker { data_length, .. } => {
-					frame.set_data(reader.read_data(data_length)?);
-					frame_tx.send(frame).unwrap();
-				}
-				frame::Frame::Header { .. } => return Err(anyhow!("unexpected header found")),
-				frame::Frame::End => {
-					break;
-				}
-				_ => {
-					frame_tx.send(frame).unwrap();
-				}
-			};
+				Ok(x) => {
+					// if we cannot send a frame, probably an error has occured in the
+					// output thread. Thus, just shut down the input thread. We will print
+					// the error in the output thread.
+					if frame_tx.send(x).is_err() {
+						break;
+					}
 
-			progress_read.set_read_frames(reader.get_count_frame().try_into().unwrap());
-			progress_read.set_read_bytes(reader.get_count_byte().try_into().unwrap());
+					// forward progress bar if everything is ok
+					progress_read.set_read_frames(reader.get_count_frame().try_into().unwrap());
+					progress_read.set_read_bytes(reader.get_count_byte().try_into().unwrap());
+				}
+				Err(e) => {
+					progress_read.finish_bytes();
+					return Err(e);
+				}
+			}
 		}
 
 		progress_read.finish_bytes();
@@ -88,17 +74,27 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 
 	let thread_output = std::thread::spawn(move || -> Result<(), anyhow::Error> {
 		for received in frame_rx {
-			output.write_frame(received)?;
-			progress_write.set_written_frames(output.get_written_frames().try_into().unwrap());
+			match output.write_frame(received) {
+				Ok(_) => progress_write
+					.set_written_frames(output.get_written_frames().try_into().unwrap()),
+				Err(e) => {
+					progress_write.finish_frames();
+					return Err(e);
+				}
+			}
 		}
 
 		progress_write.finish_frames();
 		Ok(())
 	});
 
-	progress.finish_all();
-	thread_input.join().unwrap()?;
-	thread_output.join().unwrap()?;
+	progress.finish_multi();
+	if let Err(e) = thread_input.join().unwrap() {
+		error!("{}.", e);
+	}
+	if let Err(e) = thread_output.join().unwrap() {
+		error!("{}.", e);
+	}
 
 	Ok(())
 }

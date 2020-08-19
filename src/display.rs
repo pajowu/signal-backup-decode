@@ -1,6 +1,7 @@
 /// Dispaly a progress bar
+#[derive(Clone)]
 pub struct Progress {
-	bar_multi: indicatif::MultiProgress,
+	bar_multi: std::sync::Arc<indicatif::MultiProgress>,
 	bar_bytes: Option<indicatif::ProgressBar>,
 	bar_frames: Option<indicatif::ProgressBar>,
 }
@@ -29,7 +30,7 @@ impl Progress {
 		}
 
 		Self {
-			bar_multi,
+			bar_multi: std::sync::Arc::new(bar_multi),
 			bar_bytes,
 			bar_frames,
 		}
@@ -55,17 +56,17 @@ impl Progress {
 
 	pub fn finish_frames(&self) {
 		if let Some(ref x) = self.bar_frames {
-			x.finish()
+			x.finish_at_current_pos()
 		};
 	}
 
 	pub fn finish_bytes(&self) {
 		if let Some(ref x) = self.bar_bytes {
-			x.finish()
+			x.finish_at_current_pos()
 		};
 	}
 
-	pub fn finish_all(&self) {
+	pub fn finish_multi(&self) {
 		self.bar_multi.join().unwrap();
 	}
 }

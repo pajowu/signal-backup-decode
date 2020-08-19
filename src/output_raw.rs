@@ -59,9 +59,8 @@ impl SignalOutputRaw {
 			})?,
 			count_sticker: 0,
 			count_avatar: 0,
-			// we set 2 read frames in the beginning because we have 1) a header frame
-			// and 2) a version frame we do not count in written frames.
-			written_frames: 2,
+			// we set read frames to 1 due to the header frame we will never write
+			written_frames: 1,
 			force_overwrite,
 		})
 	}
@@ -221,6 +220,12 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 
 		self.written_frames += 1;
 
+		Ok(())
+	}
+
+	fn write_version(&mut self, version: u32) -> Result<(), anyhow::Error> {
+		info!("Database Version: {:?}", version);
+		self.written_frames += 1;
 		Ok(())
 	}
 

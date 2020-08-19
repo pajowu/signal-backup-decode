@@ -24,6 +24,8 @@ pub trait SignalOutput: Send {
 		pref: &crate::Backups::SharedPreference,
 	) -> Result<(), anyhow::Error>;
 
+	fn write_version(&mut self, version: u32) -> Result<(), anyhow::Error>;
+
 	fn get_written_frames(&self) -> usize;
 
 	fn write_frame(&mut self, frame: crate::frame::Frame) -> Result<(), anyhow::Error> {
@@ -42,6 +44,7 @@ pub trait SignalOutput: Send {
 			crate::frame::Frame::Sticker { row, data, .. } => {
 				self.write_sticker(data.as_ref().unwrap(), row)
 			}
+			crate::frame::Frame::Version { version } => self.write_version(version),
 			_ => Err(anyhow!("unexpected frame found")),
 		}
 	}

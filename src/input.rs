@@ -77,7 +77,8 @@ impl InputFile {
 		Ok(attachment_data)
 	}
 
-	pub fn read_frame(&mut self) -> Result<Vec<u8>, anyhow::Error> {
+	pub fn read_frame(&mut self) -> Result<crate::frame::Frame, anyhow::Error> {
+		// read data from input file
 		let len: usize = self
 			.reader
 			.read_u32::<byteorder::BigEndian>()
@@ -93,9 +94,30 @@ impl InputFile {
 		self.decrypter.verify_mac(&frame_hmac)?;
 		self.decrypter.increase_iv();
 
+		// create frame
+		let mut frame =
+			protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
+				.with_context(|| format!("Could not parse frame from {:?}", frame_content))?;
+		let mut frame = crate::frame::Frame::new(&mut frame);
+
+		match frame {
+			crate::frame::Frame::Attachment { data_length, .. } => {
+				frame.set_data(self.read_data(data_length)?);
+			}
+			crate::frame::Frame::Avatar { data_length, .. } => {
+				frame.set_data(self.read_data(data_length)?);
+			}
+			crate::frame::Frame::Sticker { data_length, .. } => {
+				frame.set_data(self.read_data(data_length)?);
+			}
+			crate::frame::Frame::Header { .. } => return Err(anyhow!("unexpected header found")),
+			_ => (),
+		};
+
+		// clean up and return
 		self.count_frame += 1;
 		self.count_byte += len;
-		Ok(frame_content)
+		Ok(frame)
 	}
 
 	pub fn get_count_frame(&self) -> usize {
@@ -108,5 +130,22 @@ impl InputFile {
 
 	pub fn get_file_size(&self) -> u64 {
 		self.file_bytes
+	}
+}
+
+impl Iterator for InputFile {
+	type Item = Result<crate::frame::Frame, anyhow::Error>;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		let ret = self.read_frame();
+
+		if let Ok(x) = ret {
+			match x {
+				crate::frame::Frame::End => None,
+				_ => Some(Ok(x)),
+			}
+		} else {
+			Some(ret)
+		}
 	}
 }

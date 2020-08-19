@@ -61,6 +61,11 @@ impl crate::output::SignalOutput for SignalOutputNone {
 		Ok(())
 	}
 
+	fn write_version(&mut self, _version: u32) -> Result<(), anyhow::Error> {
+		self.written_frames += 1;
+		Ok(())
+	}
+
 	fn get_written_frames(&self) -> usize {
 		self.written_frames
 	}
