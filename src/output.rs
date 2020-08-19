@@ -54,5 +54,5 @@ pub trait SignalOutput: Send {
 pub enum SignalOutputType {
 	None,
 	Raw,
-        Csv,
+	Csv,
 }

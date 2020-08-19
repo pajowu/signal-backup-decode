@@ -4,11 +4,11 @@ use log::info;
 ///
 /// This output module does not write any backup files. This module can be used to check HMAC of
 /// the backup file but not writing any output.
-pub struct SignalOutputNone {
+pub struct SignalOutputCsv {
 	written_frames: usize,
 }
 
-impl SignalOutputNone {
+impl SignalOutputCsv {
 	/// Creates new output object
 	///
 	/// `force_write` determines whether existing files will be overwritten.
@@ -16,13 +16,14 @@ impl SignalOutputNone {
 		info!("No output will be written");
 
 		Self {
-			// we set read frames to 1 due to the header frame we will never write
-			written_frames: 1,
+			// we set 2 read frames in the beginning because we have 1) a header frame
+			// and 2) a version frame we do not count in written frames.
+			written_frames: 2,
 		}
 	}
 }
 
-impl crate::output::SignalOutput for SignalOutputNone {
+impl crate::output::SignalOutput for SignalOutputCsv {
 	fn write_statement(
 		&mut self,
 		_statement: &str,

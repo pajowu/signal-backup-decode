@@ -1,5 +1,5 @@
-use std::convert::TryInto;
 use anyhow::Context;
+use std::convert::TryInto;
 
 /// Frame
 pub enum Frame {
@@ -148,22 +148,33 @@ impl Frame {
 }
 
 impl std::fmt::Display for Frame {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Header { salt, iv } => {
-                write!(f, "Salt: {:02X?} (length: {}), IV: {:02X?} (length: {})", salt, salt.len(), iv, iv.len())
-            }
-            _ => Ok(())
-        }
-    }
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Header { salt, iv } => write!(
+				f,
+				"Header Frame (salt: {:02X?} (length: {}), iv: {:02X?} (length: {}))",
+				salt,
+				salt.len(),
+				iv,
+				iv.len()
+			),
+			Self::Sticker { data_length, .. } => write!(f, "Sticker (size: {})", data_length),
+			Self::Attachment { data_length, .. } => write!(f, "Attachment (size: {})", data_length),
+			Self::Avatar { data_length, .. } => write!(f, "Avatar (size: {})", data_length),
+			Self::Preference { .. } => write!(f, "Preference"),
+			Self::Statement { .. } => write!(f, "Statement"),
+			Self::Version { version } => write!(f, "Version ({})", version),
+			Self::End => write!(f, "End"),
+		}
+	}
 }
 
 impl std::convert::TryFrom<Vec<u8>> for Frame {
-    type Error = anyhow::Error;
+	type Error = anyhow::Error;
 
-    fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
-        let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&data)
-				.with_context(|| format!("Could not parse frame from {:02X?}", &data))?;
-        Ok(Self::new(&mut frame))
-    }
+	fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
+		let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&data)
+			.with_context(|| format!("Could not parse frame from {:02X?}", &data))?;
+		Ok(Self::new(&mut frame))
+	}
 }
