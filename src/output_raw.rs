@@ -41,7 +41,7 @@ impl SignalOutputRaw {
 				})?;
 			} else {
 				return Err(anyhow!(
-					"Backup database already exists and should not be overwritten. Try -f"
+					"Backup database already exists and may not be overwritten. Try -f"
 				));
 			}
 		}
@@ -76,7 +76,7 @@ impl SignalOutputRaw {
 
 		if path.exists() && !self.force_overwrite {
 			return Err(anyhow!(
-				"File already exists and should not be overwritten: {}",
+				"File already exists and may not be overwritten: {}",
 				path.to_string_lossy()
 			));
 		}
@@ -105,7 +105,7 @@ impl SignalOutputRaw {
 		// check output path
 		if !force_overwrite && folder.exists() {
 			return Err(anyhow!(
-				"{} already exists and should not be overwritten. Try -f",
+				"{} already exists and may not be overwritten. Try -f",
 				folder.to_string_lossy()
 			));
 		}
