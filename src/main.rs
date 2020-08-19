@@ -1,7 +1,4 @@
-use anyhow::anyhow;
-use anyhow::Context;
 use log::error;
-use log::info;
 use std::convert::TryInto;
 
 mod Backups;
@@ -32,14 +29,17 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	// and to display correct status
 	let (frame_tx, frame_rx) = std::sync::mpsc::sync_channel(10);
 
-	let thread_input = std::thread::spawn(move || {
+	let thread_input = std::thread::spawn(move || -> Result<(), anyhow::Error> {
+		// we have to use a while let loop here because we want to access the reader object
+		// in the loop. This does not work with a simple for loop.
+		#[allow(clippy::while_let_on_iterator)]
 		while let Some(frame) = reader.next() {
 			match frame {
 				Ok(x) => {
 					// if we cannot send a frame, probably an error has occured in the
 					// output thread. Thus, just shut down the input thread. We will print
 					// the error in the output thread.
-					if let Err(_) = frame_tx.send(x) {
+					if frame_tx.send(x).is_err() {
 						break;
 					}
 
@@ -48,33 +48,39 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 					progress_read.set_read_bytes(reader.get_count_byte().try_into().unwrap());
 				}
 				Err(e) => {
-					error!("{}.", e);
-					break;
+					progress_read.finish_bytes();
+					return Err(e);
 				}
 			}
 		}
 
-		progress_read.bar_bytes.finish_at_current_pos();
+		progress_read.finish_bytes();
+		Ok(())
 	});
 
-	let thread_output = std::thread::spawn(move || {
+	let thread_output = std::thread::spawn(move || -> Result<(), anyhow::Error> {
 		for received in frame_rx {
 			match output.write_frame(received) {
 				Ok(_) => progress_write
 					.set_written_frames(output.get_written_frames().try_into().unwrap()),
 				Err(e) => {
-					error!("{}.", e);
-					break;
+					progress_write.finish_frames();
+					return Err(e);
 				}
 			}
 		}
 
-		progress_write.bar_frames.finish_at_current_pos();
+		progress_write.finish_frames();
+		Ok(())
 	});
 
-	progress.finish_all();
-	thread_input.join().unwrap();
-	thread_output.join().unwrap();
+	progress.finish_multi();
+	if let Err(e) = thread_input.join().unwrap() {
+		error!("{}.", e);
+	}
+	if let Err(e) = thread_output.join().unwrap() {
+		error!("{}.", e);
+	}
 
 	Ok(())
 }

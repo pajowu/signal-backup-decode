@@ -2,8 +2,8 @@
 #[derive(Clone)]
 pub struct Progress {
 	bar_multi: std::sync::Arc<indicatif::MultiProgress>,
-	pub bar_bytes: indicatif::ProgressBar,
-	pub bar_frames: indicatif::ProgressBar,
+	bar_bytes: indicatif::ProgressBar,
+	bar_frames: indicatif::ProgressBar,
 }
 
 impl Progress {
@@ -41,14 +41,14 @@ impl Progress {
 	}
 
 	pub fn finish_frames(&self) {
-		self.bar_frames.finish();
+		self.bar_frames.finish_at_current_pos();
 	}
 
 	pub fn finish_bytes(&self) {
-		self.bar_bytes.finish();
+		self.bar_bytes.finish_at_current_pos();
 	}
 
-	pub fn finish_all(&self) {
+	pub fn finish_multi(&self) {
 		self.bar_multi.join().unwrap();
 	}
 }
