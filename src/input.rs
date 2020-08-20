@@ -45,7 +45,8 @@ impl InputFile {
 				reader,
 				decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
 				count_frame: 1,
-				count_byte: len,
+				// we already read `len` and 4 bytes with read_u32
+				count_byte: len + std::mem::size_of::<u32>(),
 				file_bytes,
 			}),
 			_ => Err(anyhow!("first frame is not a header")),
@@ -57,7 +58,7 @@ impl InputFile {
 		length: usize,
 		read_attachment: bool,
 	) -> Result<Vec<u8>, anyhow::Error> {
-		let mut hmac = [0u8; 10];
+		let mut hmac = [0u8; crate::decrypter::LENGTH_HMAC];
 		let mut data;
 
 		// Reading files (attachments) need an update of MAC with IV.
@@ -67,7 +68,7 @@ impl InputFile {
 			self.decrypter.mac_update_with_iv();
 			data = vec![0u8; length];
 		} else {
-			data = vec![0u8; length - 10];
+			data = vec![0u8; length - crate::decrypter::LENGTH_HMAC];
 		}
 
 		// read data and decrypt
@@ -83,11 +84,11 @@ impl InputFile {
 
 		if read_attachment {
 			// we got file length, so we have to add 10 bytes for hmac data
-			self.count_byte += length + 10;
+			self.count_byte += length + crate::decrypter::LENGTH_HMAC;
 		} else {
 			// in the case of frames, we add 4 bytes we have read to determine frame length
 			// (hmac data is already in length included)
-			self.count_byte += length + 4;
+			self.count_byte += length + std::mem::size_of::<u32>();
 		}
 
 		Ok(data)
@@ -102,7 +103,7 @@ impl InputFile {
 			.try_into()
 			.unwrap();
 		debug!(
-			"Read frame number {} with length {} (bytes)",
+			"Read frame number {} with length of {} bytes",
 			self.count_frame, len
 		);
 

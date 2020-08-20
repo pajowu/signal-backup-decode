@@ -1,9 +1,4 @@
-use log::info;
-
-/// Write no output of backup
-///
-/// This output module does not write any backup files. This module can be used to check HMAC of
-/// the backup file but not writing any output.
+/// Write csv output of backup
 pub struct SignalOutputCsv {
 	written_frames: usize,
 }
@@ -13,12 +8,9 @@ impl SignalOutputCsv {
 	///
 	/// `force_write` determines whether existing files will be overwritten.
 	pub fn new() -> Self {
-		info!("No output will be written");
-
 		Self {
-			// we set 2 read frames in the beginning because we have 1) a header frame
-			// and 2) a version frame we do not count in written frames.
-			written_frames: 2,
+			// we set read frames to 1 due to the header frame we will never write
+			written_frames: 1,
 		}
 	}
 }
@@ -26,9 +18,13 @@ impl SignalOutputCsv {
 impl crate::output::SignalOutput for SignalOutputCsv {
 	fn write_statement(
 		&mut self,
-		_statement: &str,
-		_parameters: &[rusqlite::types::Value],
+		statement: &str,
+		parameters: &[rusqlite::types::Value],
 	) -> Result<(), anyhow::Error> {
+		if statement == "INSERT INTO sms VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" {
+			println!("{:?}", parameters);
+		}
+
 		self.written_frames += 1;
 		Ok(())
 	}

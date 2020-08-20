@@ -5,6 +5,9 @@ use hmac::crypto_mac::NewMac;
 use sha2::Digest;
 use subtle::ConstantTimeEq;
 
+/// Used length of HMAC in bytes
+pub const LENGTH_HMAC: usize = 10;
+
 /// Decrypt bytes
 pub struct Decrypter {
 	mac: Option<hmac::Hmac<sha2::Sha256>>,
@@ -68,7 +71,7 @@ impl Decrypter {
 	pub fn verify_mac(&mut self, hmac_control: &[u8]) -> Result<(), DecryptError> {
 		if let Some(ref mut hmac) = self.mac {
 			let result = hmac.finalize_reset();
-			let code_bytes = &result.into_bytes()[..10];
+			let code_bytes = &result.into_bytes()[..LENGTH_HMAC];
 
 			// compare to given hmac
 			let result = code_bytes.ct_eq(&hmac_control);
