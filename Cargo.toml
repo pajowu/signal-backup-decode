@@ -28,6 +28,7 @@ indicatif = "^0.15"
 infer = "^0.2"
 csv = "^1.1"
 serde = { version = "^1.0", features = ["derive"] }
+chrono = { version = "^0.4", features = ["serde"] }
 
 [build-dependencies]
 protoc-rust = {version = "^2.14", optional = true}
