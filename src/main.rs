@@ -7,11 +7,11 @@ mod decrypter;
 mod display;
 mod frame;
 mod input;
+mod message;
 mod output;
 mod output_csv;
 mod output_none;
 mod output_raw;
-mod message;
 
 fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	// output
@@ -22,8 +22,12 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 		crate::output::SignalOutputType::Raw => Box::new(crate::output_raw::SignalOutputRaw::new(
 			&config.path_output,
 			config.force_overwrite,
+			true,
 		)?),
-		crate::output::SignalOutputType::Csv => Box::new(crate::output_csv::SignalOutputCsv::new(&config.path_output, config.force_overwrite)?),
+		crate::output::SignalOutputType::Csv => Box::new(crate::output_csv::SignalOutputCsv::new(
+			&config.path_output,
+			config.force_overwrite,
+		)?),
 	};
 
 	// input
@@ -88,15 +92,16 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 		}
 
 		progress_write.finish_frames();
+		output.finish()?;
 		Ok(())
 	});
 
 	progress.finish_multi();
 	if let Err(e) = thread_input.join().unwrap() {
-		error!("{}.", e);
+		error!("{:#}.", e);
 	}
 	if let Err(e) = thread_output.join().unwrap() {
-		error!("{}.", e);
+		error!("{:#}.", e);
 	}
 
 	Ok(())
@@ -117,7 +122,7 @@ fn main() {
 	.unwrap();
 
 	if let Err(e) = run(&config) {
-		error!("{}.", e);
+		error!("{:#}.", e);
 		std::process::exit(1);
 	}
 }

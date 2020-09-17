@@ -68,4 +68,8 @@ impl crate::output::SignalOutput for SignalOutputNone {
 	fn get_written_frames(&self) -> usize {
 		self.written_frames
 	}
+
+	fn finish(&mut self) -> Result<(), anyhow::Error> {
+		Ok(())
+	}
 }

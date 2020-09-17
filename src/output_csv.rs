@@ -4,7 +4,7 @@ use log::info;
 
 /// Write csv output of backup
 pub struct SignalOutputCsv {
-        writer: csv::Writer<std::fs::File>,
+	writer: csv::Writer<std::fs::File>,
 	written_frames: usize,
 }
 
@@ -15,18 +15,25 @@ impl SignalOutputCsv {
 	pub fn new(path: &std::path::Path, force_overwrite: bool) -> Result<Self, anyhow::Error> {
 		info!("Output path: {}", &path.to_string_lossy());
 
-		Self::set_directory(&path, "", force_overwrite)?;
+		// check output path
+		if path.exists() && !path.is_dir() {
+			return Err(anyhow!(
+				"{} exists and is not a directory",
+				path.to_string_lossy()
+			));
+		} else {
+			std::fs::create_dir_all(&path).with_context(|| {
+				format!("Path could not be created: {}", path.to_string_lossy())
+			})?;
+		}
 
-		// determine csv path
+		// open csv connection
 		let path_csv = path.join("signal_backup.csv");
 
 		if path_csv.exists() {
 			if force_overwrite {
 				std::fs::remove_file(&path_csv).with_context(|| {
-					format!(
-						"could not delete old file: {}",
-						path_csv.to_string_lossy()
-					)
+					format!("Could not delete old file: {}", path_csv.to_string_lossy())
 				})?;
 			} else {
 				return Err(anyhow!(
@@ -36,40 +43,10 @@ impl SignalOutputCsv {
 		}
 
 		Ok(Self {
-                        writer: csv::Writer::from_path(path_csv)?,
+			writer: csv::Writer::from_path(path_csv)?,
 			// we set read frames to 1 due to the header frame we will never write
 			written_frames: 1,
 		})
-	}
-
-	fn set_directory(
-		base: &std::path::Path,
-		name: &str,
-		force_overwrite: bool,
-	) -> Result<std::path::PathBuf, anyhow::Error> {
-		let folder = base.join(name);
-
-		// check output path
-		if !force_overwrite && folder.exists() {
-			return Err(anyhow!(
-				"{} already exists and may not be overwritten. Try -f",
-				folder.to_string_lossy()
-			));
-		}
-
-		if folder.exists() && !folder.is_dir() {
-			return Err(anyhow!(
-				"{} exists and is not a directory",
-				folder.to_string_lossy()
-			));
-		}
-
-		if !folder.exists() {
-			std::fs::create_dir(&folder)
-				.with_context(|| format!("{} could not be created", folder.to_string_lossy()))?;
-		}
-
-		Ok(folder)
 	}
 }
 
@@ -80,8 +57,8 @@ impl crate::output::SignalOutput for SignalOutputCsv {
 		parameters: &[rusqlite::types::Value],
 	) -> Result<(), anyhow::Error> {
 		if statement.starts_with("INSERT INTO sms") {
-                    let mess = crate::message::Message::new(parameters);
-                    self.writer.serialize(mess)?;
+			let mess = crate::message::Message::new(parameters);
+			self.writer.serialize(mess)?;
 		}
 
 		self.written_frames += 1;
@@ -123,5 +100,9 @@ impl crate::output::SignalOutput for SignalOutputCsv {
 
 	fn get_written_frames(&self) -> usize {
 		self.written_frames
+	}
+
+	fn finish(&mut self) -> Result<(), anyhow::Error> {
+		Ok(())
 	}
 }

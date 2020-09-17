@@ -48,6 +48,8 @@ pub trait SignalOutput: Send {
 			_ => Err(anyhow!("unexpected frame found")),
 		}
 	}
+
+	fn finish(&mut self) -> Result<(), anyhow::Error>;
 }
 
 /// Defined output types
