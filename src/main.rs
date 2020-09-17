@@ -11,7 +11,7 @@ mod output_raw;
 
 fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	// output
-	let mut output = output_raw::Output::new(&config.path_output_main, true)?;
+	let mut output = output_raw::Output::new(&config.path_output_main, true, true)?;
 
 	// input
 	let mut reader =
@@ -71,15 +71,16 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 		}
 
 		progress_write.finish_frames();
+		output.finish()?;
 		Ok(())
 	});
 
 	progress.finish_multi();
 	if let Err(e) = thread_input.join().unwrap() {
-		error!("{}.", e);
+		error!("{:#}.", e);
 	}
 	if let Err(e) = thread_output.join().unwrap() {
-		error!("{}.", e);
+		error!("{:#}.", e);
 	}
 
 	Ok(())
@@ -100,7 +101,7 @@ fn main() {
 	.unwrap();
 
 	if let Err(e) = run(&config) {
-		error!("{}.", e);
+		error!("{:#}.", e);
 		std::process::exit(1);
 	}
 }

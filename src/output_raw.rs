@@ -8,11 +8,10 @@ use std::io::Write;
 /// This output module writes the backup in a sqlite database and media files in different
 /// directories.
 pub struct Output {
-	path_avatar: std::path::PathBuf,
-	path_attachment: std::path::PathBuf,
-	path_sticker: std::path::PathBuf,
-	path_config: std::path::PathBuf,
+	path_output: std::path::PathBuf,
+	force_write: bool,
 	sqlite_connection: rusqlite::Connection,
+	sqlite_in_memory: bool,
 	count_attachment: usize,
 	count_sticker: usize,
 	count_avatar: usize,
@@ -23,50 +22,59 @@ impl Output {
 	/// Creates new output object
 	///
 	/// `force_write` determines whether existing files will be overwritten.
-	pub fn new(path: &std::path::Path, force_write: bool) -> Result<Self, anyhow::Error> {
+	pub fn new(
+		path: &std::path::Path,
+		force_write: bool,
+		open_db_in_memory: bool,
+	) -> Result<Self, anyhow::Error> {
 		// check output path
-		if !force_write && path.exists() {
-			return Err(anyhow!(
-				"{} already exists and should not be overwritten",
-				path.to_string_lossy()
-			));
-		}
-
 		if path.exists() && !path.is_dir() {
 			return Err(anyhow!(
 				"{} exists and is not a directory",
 				path.to_string_lossy()
 			));
-		}
-
-		if !path.exists() {
-			std::fs::create_dir(&path)
-				.with_context(|| format!("{} could not be created", path.to_string_lossy()))?;
-		}
-
-		// determine sqlite path
-		let path_sqlite = path.join("signal_backup.db");
-
-		if path_sqlite.exists() {
-			std::fs::remove_file(&path_sqlite).with_context(|| {
-				format!(
-					"could not delete old database: {}",
-					path_sqlite.to_string_lossy()
-				)
+		} else {
+			std::fs::create_dir_all(&path).with_context(|| {
+				format!("Path could not be created: {}", path.to_string_lossy())
 			})?;
 		}
 
-		Ok(Self {
-			path_avatar: Output::set_directory(&path, "avatar")?,
-			path_attachment: Output::set_directory(&path, "attachment")?,
-			path_sticker: Output::set_directory(&path, "sticker")?,
-			path_config: Output::set_directory(&path, "config")?,
-			sqlite_connection: rusqlite::Connection::open(&path_sqlite).with_context(|| {
+		// open database connection
+		let path_sqlite = path.join("signal_backup.db");
+
+		if path_sqlite.exists() && !force_write {
+			if force_write {
+				std::fs::remove_file(&path_sqlite).with_context(|| {
+					format!(
+						"Could not delete old database: {}",
+						path_sqlite.to_string_lossy()
+					)
+				})?;
+			} else {
+				return Err(anyhow!(
+					"Sqlite database already exists: {}. Try -f",
+					path_sqlite.to_string_lossy()
+				));
+			}
+		}
+
+		let sqlite_connection = if open_db_in_memory {
+			rusqlite::Connection::open_in_memory()
+				.with_context(|| format!("could not open connection to in memory database",))?
+		} else {
+			rusqlite::Connection::open(&path_sqlite).with_context(|| {
 				format!(
-					"could not open connection to database file: {}.",
+					"could not open connection to database file: {}",
 					path_sqlite.to_string_lossy()
 				)
-			})?,
+			})?
+		};
+
+		Ok(Self {
+			path_output: path.to_path_buf(),
+			force_write,
+			sqlite_connection,
+			sqlite_in_memory: open_db_in_memory,
 			count_attachment: 0,
 			count_sticker: 0,
 			count_avatar: 0,
@@ -106,13 +114,25 @@ impl Output {
 		attachmend_id: u64,
 		row_id: u64,
 	) -> Result<(), anyhow::Error> {
-		let path = self
-			.path_attachment
-			.join(format!("{}_{}", attachmend_id, row_id));
+		// create path to attachment file
+		let path = self.path_output.join("attachment");
+		std::fs::create_dir_all(&path)
+			.with_context(|| format!("Failed to create path: {}", path.to_string_lossy()))?;
+
+		// open connection to file
+		let path = path.join(format!("{}_{}", attachmend_id, row_id));
+		if path.exists() && !self.force_write {
+			return Err(anyhow!(
+				"Attachment file does already exist: {}. Try -f",
+				path.to_string_lossy()
+			));
+		}
+
 		let mut buffer = std::fs::File::create(&path).with_context(|| {
 			format!("Failed to open attachment file: {}", path.to_string_lossy())
 		})?;
 
+		// write to file
 		buffer.write_all(data).with_context(|| {
 			format!(
 				"Failed to write to attachment file: {}",
@@ -132,13 +152,24 @@ impl Output {
 		//    path = self.path_sticker.join(format!("{}_{}", row_id, 2));
 		//}
 
-		let path = self
-			.path_sticker
-			.join(format!("{}_{}", row_id, self.count_sticker));
-		let mut buffer = std::fs::File::create(&path).with_context(|| {
-			format!("Failed to open attachment file: {}", path.to_string_lossy())
-		})?;
+		// create path to attachment file
+		let path = self.path_output.join("sticker");
+		std::fs::create_dir_all(&path)
+			.with_context(|| format!("Failed to create path: {}", path.to_string_lossy()))?;
 
+		// open connection to file
+		let path = path.join(format!("{}_{}", row_id, self.count_sticker));
+		if path.exists() && !self.force_write {
+			return Err(anyhow!(
+				"Sticker file does already exist: {}. Try -f",
+				path.to_string_lossy()
+			));
+		}
+
+		let mut buffer = std::fs::File::create(&path)
+			.with_context(|| format!("Failed to open sticker file: {}", path.to_string_lossy()))?;
+
+		// write to file
 		buffer.write_all(data).with_context(|| {
 			format!(
 				"Failed to write to attachment file: {}",
@@ -146,7 +177,6 @@ impl Output {
 			)
 		})?;
 
-		self.count_attachment += 1;
 		self.count_sticker += 1;
 		self.written_frames += 1;
 
@@ -159,13 +189,24 @@ impl Output {
 		//    path = self.path_sticker.join(format!("{}_{}", row_id, 2));
 		//}
 
-		let path = self
-			.path_avatar
-			.join(format!("{}_{}", name, self.count_avatar));
-		let mut buffer = std::fs::File::create(&path).with_context(|| {
-			format!("Failed to open attachment file: {}", path.to_string_lossy())
-		})?;
+		// create path to attachment file
+		let path = self.path_output.join("avatar");
+		std::fs::create_dir_all(&path)
+			.with_context(|| format!("Failed to create path: {}", path.to_string_lossy()))?;
 
+		// open connection to file
+		let path = path.join(format!("{}_{}", name, self.count_avatar));
+		if path.exists() && !self.force_write {
+			return Err(anyhow!(
+				"Avatar file does already exist: {}. Try -f",
+				path.to_string_lossy()
+			));
+		}
+
+		let mut buffer = std::fs::File::create(&path)
+			.with_context(|| format!("Failed to open avatar file: {}", path.to_string_lossy()))?;
+
+		// write to file
 		buffer.write_all(data).with_context(|| {
 			format!(
 				"Failed to write to attachment file: {}",
@@ -173,7 +214,6 @@ impl Output {
 			)
 		})?;
 
-		self.count_attachment += 1;
 		self.count_avatar += 1;
 		self.written_frames += 1;
 
@@ -184,7 +224,21 @@ impl Output {
 		&mut self,
 		pref: &crate::Backups::SharedPreference,
 	) -> Result<(), anyhow::Error> {
-		let path = self.path_config.join(pref.get_file());
+		// create path to attachment file
+		let path = self.path_output.join("preference");
+		std::fs::create_dir_all(&path)
+			.with_context(|| format!("Failed to create path: {}", path.to_string_lossy()))?;
+
+		// open connection to file
+		let path = path.join(pref.get_file());
+		if path.exists() && !self.force_write {
+			return Err(anyhow!(
+				"Config file does already exist: {}. Try -f",
+				path.to_string_lossy()
+			));
+		}
+
+		// write to file
 		let mut conf = ini::Ini::load_from_file(&path).unwrap_or_default();
 		conf.with_section(None::<String>)
 			.set(pref.get_key(), pref.get_value());
@@ -231,22 +285,25 @@ impl Output {
 		self.written_frames
 	}
 
-	fn set_directory(
-		base: &std::path::Path,
-		name: &str,
-	) -> Result<std::path::PathBuf, anyhow::Error> {
-		let folder = base.join(name);
-
-		if !folder.exists() {
-			std::fs::create_dir(&folder)
-				.with_context(|| format!("{} could not be created.", folder.to_string_lossy()))?;
-		} else if !folder.is_dir() {
-			return Err(anyhow!(
-				"{} exists and is not a directory.",
-				folder.to_string_lossy()
-			));
+	pub fn finish(&mut self) -> Result<(), anyhow::Error> {
+		if !self.sqlite_in_memory {
+			return Ok(());
 		}
 
-		Ok(folder)
+		let path_sqlite = self.path_output.join("signal_backup.db");
+
+		self.sqlite_connection
+			.execute(
+				&format!("VACUUM INTO \"{}\";", path_sqlite.to_string_lossy()),
+				rusqlite::NO_PARAMS,
+			)
+			.with_context(|| {
+				format!(
+					"Failed to copy in memory database to file: {}",
+					path_sqlite.to_string_lossy()
+				)
+			})?;
+
+		Ok(())
 	}
 }
