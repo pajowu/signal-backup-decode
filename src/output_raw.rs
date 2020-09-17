@@ -134,6 +134,7 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 			|| statement.contains("_fts")
 			|| statement.starts_with("CREATE TABLE sqlite_")
 		{
+			self.written_frames += 1;
 			return Ok(());
 		}
 
