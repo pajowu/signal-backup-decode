@@ -22,6 +22,8 @@ pub struct Config {
 	pub force_overwrite: bool,
 	/// Output type
 	pub output_type: crate::output::SignalOutputType,
+	/// Use in memory sqlite database
+	pub output_raw_db_in_memory: bool,
 }
 
 impl Config {
@@ -73,6 +75,11 @@ impl Config {
 				clap::Arg::with_name("no-verify-mac")
 					.help("Do not verify the HMAC of each frame in the backup")
 					.long("no-verify-mac"),
+			)
+			.arg(
+				clap::Arg::with_name("in-memory-db")
+					.help("Use in memory sqlite database and flush at the end to output file (only considered with output type RAW).")
+					.long("in-memory-db"),
 			)
 			.arg(
 				clap::Arg::with_name("password-string")
@@ -181,6 +188,7 @@ impl Config {
 			log_level,
 			force_overwrite: matches.is_present("force-overwrite"),
 			output_type,
+			output_raw_db_in_memory: matches.is_present("in-memory-db"),
 		})
 	}
 }

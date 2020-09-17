@@ -22,7 +22,7 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 		crate::output::SignalOutputType::Raw => Box::new(crate::output_raw::SignalOutputRaw::new(
 			&config.path_output,
 			config.force_overwrite,
-			true,
+			config.output_raw_db_in_memory,
 		)?),
 		crate::output::SignalOutputType::Csv => Box::new(crate::output_csv::SignalOutputCsv::new(
 			&config.path_output,
