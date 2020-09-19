@@ -45,8 +45,10 @@ impl InputFile {
 				reader,
 				decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
 				count_frame: 1,
-				// we already read `len` and 4 bytes with read_u32
-				count_byte: len + std::mem::size_of::<u32>(),
+				// We already read `len` and 4 bytes with read_u32
+				// There are 16 bytes missing somewhere independent of the input
+				// file. However, I don't know why.
+				count_byte: len + std::mem::size_of::<u32>() + 16,
 				file_bytes,
 			}),
 			_ => Err(anyhow!("first frame is not a header")),
