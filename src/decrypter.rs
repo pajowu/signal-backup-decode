@@ -1,7 +1,6 @@
-use aes_ctr::stream_cipher::NewStreamCipher;
-use aes_ctr::stream_cipher::SyncStreamCipher;
 use hmac::crypto_mac::Mac;
 use hmac::crypto_mac::NewMac;
+use openssl;
 use sha2::Digest;
 use subtle::ConstantTimeEq;
 
@@ -11,7 +10,6 @@ pub const LENGTH_HMAC: usize = 10;
 /// Decrypt bytes
 pub struct Decrypter {
 	mac: Option<hmac::Hmac<sha2::Sha256>>,
-	cipher: aes_ctr::Aes256Ctr,
 	key: Vec<u8>,
 	iv: Vec<u8>,
 }
@@ -42,24 +40,26 @@ impl Decrypter {
 			} else {
 				None
 			},
-			cipher: aes_ctr::Aes256Ctr::new(
-				generic_array::GenericArray::from_slice(&okm[..32]),
-				generic_array::GenericArray::from_slice(&iv),
-			),
 			key: okm[..32].to_vec(),
 			iv: iv.to_vec(),
 		}
 	}
 
-	pub fn decrypt(&mut self, mut data_decrypt: &mut [u8]) {
+	pub fn decrypt(&mut self, mut data_encrypted: &[u8]) -> Vec<u8> {
 		// check hmac?
 		if let Some(ref mut hmac) = self.mac {
 			// calculate hmac of frame data
-			hmac.update(&data_decrypt);
+			hmac.update(&data_encrypted);
 		}
 
 		// decrypt
-		self.cipher.apply_keystream(&mut data_decrypt);
+		openssl::symm::decrypt(
+			openssl::symm::Cipher::aes_256_ctr(),
+			&self.key,
+			Some(&self.iv),
+			data_encrypted,
+		)
+		.unwrap()
 	}
 
 	pub fn mac_update_with_iv(&mut self) {
@@ -97,11 +97,6 @@ impl Decrypter {
 				*v = 0;
 			}
 		}
-
-		self.cipher = aes_ctr::Aes256Ctr::new(
-			generic_array::GenericArray::from_slice(&self.key),
-			generic_array::GenericArray::from_slice(&self.iv),
-		);
 	}
 }
 
@@ -140,10 +135,6 @@ mod tests {
 		// test increase at position 3
 		let mut dec = Decrypter {
 			mac: None,
-			cipher: aes_ctr::Aes256Ctr::new(
-				&generic_array::GenericArray::from_slice(&key),
-				&generic_array::GenericArray::from_slice(&iv),
-			),
 			key: key.to_vec(),
 			iv: iv.to_vec(),
 		};
@@ -157,10 +148,6 @@ mod tests {
 		iv[2] = 255;
 		let mut dec = Decrypter {
 			mac: None,
-			cipher: aes_ctr::Aes256Ctr::new(
-				&generic_array::GenericArray::from_slice(&key),
-				&generic_array::GenericArray::from_slice(&iv),
-			),
 			key: key.to_vec(),
 			iv: iv.to_vec(),
 		};

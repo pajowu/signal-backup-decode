@@ -1,5 +1,4 @@
 use serde::Serialize;
-use std::convert::TryInto;
 
 /// A Signal message
 #[derive(Serialize)]
