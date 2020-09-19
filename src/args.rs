@@ -77,9 +77,9 @@ impl Config {
 					.long("no-verify-mac"),
 			)
 			.arg(
-				clap::Arg::with_name("in-memory-db")
-					.help("Use in memory sqlite database and flush at the end to output file (only considered with output type RAW).")
-					.long("in-memory-db"),
+				clap::Arg::with_name("no-in-memory-db")
+					.help("Do not use in memory sqlite database. Database is immediately created on disk (only considered with output type RAW).")
+					.long("no-in-memory-db"),
 			)
 			.arg(
 				clap::Arg::with_name("password-string")
@@ -188,7 +188,7 @@ impl Config {
 			log_level,
 			force_overwrite: matches.is_present("force-overwrite"),
 			output_type,
-			output_raw_db_in_memory: matches.is_present("in-memory-db"),
+			output_raw_db_in_memory: !matches.is_present("no-in-memory-db"),
 		})
 	}
 }

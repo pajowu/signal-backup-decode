@@ -45,7 +45,7 @@ impl Decrypter {
 		}
 	}
 
-	pub fn decrypt(&mut self, mut data_encrypted: &[u8]) -> Vec<u8> {
+	pub fn decrypt(&mut self, data_encrypted: &[u8]) -> Vec<u8> {
 		// check hmac?
 		if let Some(ref mut hmac) = self.mac {
 			// calculate hmac of frame data
