@@ -139,7 +139,6 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 		}
 
 		debug!("Write statement: {}", &statement);
-
 		let mut stmt = self
 			.sqlite_connection
 			.prepare_cached(statement)

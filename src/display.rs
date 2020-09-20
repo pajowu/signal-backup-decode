@@ -15,7 +15,7 @@ impl Progress {
                     .template("Read vs. written frames: [{elapsed_precise}] [{bar:50.cyan/cyan}] {pos:>5}/{len:5}")
                     .progress_chars("#>-");
 
-		let bar_multi = indicatif::MultiProgress::new();
+    let bar_multi = indicatif::MultiProgress::new();
 		let bar_bytes;
 		let bar_frames;
 
