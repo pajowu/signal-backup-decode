@@ -60,7 +60,7 @@ impl Output {
 
 		let sqlite_connection = if open_db_in_memory {
 			rusqlite::Connection::open_in_memory()
-				.with_context(|| format!("could not open connection to in memory database",))?
+				.with_context(|| "could not open connection to in memory database".to_string(),)?
 		} else {
 			rusqlite::Connection::open(&path_sqlite).with_context(|| {
 				format!(
