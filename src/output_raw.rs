@@ -1,13 +1,13 @@
 use anyhow::anyhow;
 use anyhow::Context;
-use log::info;
+use log::{debug, info};
 use std::io::Write;
 
 /// Write raw backup
 ///
 /// This output module writes the backup in a sqlite database and media files in different
 /// directories.
-pub struct Output {
+pub struct SignalOutputRaw {
 	path_output: std::path::PathBuf,
 	force_write: bool,
 	sqlite_connection: rusqlite::Connection,
@@ -18,7 +18,7 @@ pub struct Output {
 	written_frames: usize,
 }
 
-impl Output {
+impl SignalOutputRaw {
 	/// Creates new output object
 	///
 	/// `force_write` determines whether existing files will be overwritten.
@@ -27,6 +27,8 @@ impl Output {
 		force_write: bool,
 		open_db_in_memory: bool,
 	) -> Result<Self, anyhow::Error> {
+		info!("Output path: {}", &path.to_string_lossy());
+
 		// check output path
 		if path.exists() && !path.is_dir() {
 			return Err(anyhow!(
@@ -42,7 +44,7 @@ impl Output {
 		// open database connection
 		let path_sqlite = path.join("signal_backup.db");
 
-		if path_sqlite.exists() && !force_write {
+		if path_sqlite.exists() {
 			if force_write {
 				std::fs::remove_file(&path_sqlite).with_context(|| {
 					format!(
@@ -52,7 +54,7 @@ impl Output {
 				})?;
 			} else {
 				return Err(anyhow!(
-					"Sqlite database already exists: {}. Try -f",
+					"Backup database already exists: {}. Try -f",
 					path_sqlite.to_string_lossy()
 				));
 			}
@@ -83,7 +85,46 @@ impl Output {
 		})
 	}
 
-	pub fn write_statement(
+	fn write_to_file(
+		&self,
+		path_specific: &str,
+		filename: &str,
+		data: &[u8],
+	) -> Result<(), anyhow::Error> {
+		// create path to attachment file
+		let path = self.path_output.join(path_specific);
+		std::fs::create_dir_all(&path)
+			.with_context(|| format!("Failed to create path: {}", path.to_string_lossy()))?;
+
+		// add filename and extension to path
+		let mut path = path.join(filename);
+		let infer = infer::Infer::new();
+		if let Some(x) = infer.get(&data) {
+			path.set_extension(x.ext);
+		}
+
+		if path.exists() && !self.force_write {
+			return Err(anyhow!(
+				"File does already exist: {}. Try -f",
+				path.to_string_lossy()
+			));
+		}
+
+		// open connection to file
+		let mut buffer = std::fs::File::create(&path)
+			.with_context(|| format!("Failed to open file: {}", path.to_string_lossy()))?;
+
+		// write to file
+		buffer
+			.write_all(data)
+			.with_context(|| format!("Failed to write to file: {}", path.to_string_lossy()))?;
+
+		Ok(())
+	}
+}
+
+impl crate::output::SignalOutput for SignalOutputRaw {
+	fn write_statement(
 		&mut self,
 		statement: &str,
 		parameters: &[rusqlite::types::Value],
@@ -93,9 +134,11 @@ impl Output {
 			|| statement.contains("_fts")
 			|| statement.starts_with("CREATE TABLE sqlite_")
 		{
+			self.written_frames += 1;
 			return Ok(());
 		}
 
+		debug!("Write statement: {}", &statement);
 		let mut stmt = self
 			.sqlite_connection
 			.prepare_cached(statement)
@@ -108,37 +151,17 @@ impl Output {
 		Ok(())
 	}
 
-	pub fn write_attachment(
+	fn write_attachment(
 		&mut self,
 		data: &[u8],
 		attachmend_id: u64,
 		row_id: u64,
 	) -> Result<(), anyhow::Error> {
-		// create path to attachment file
-		let path = self.path_output.join("attachment");
-		std::fs::create_dir_all(&path)
-			.with_context(|| format!("Failed to create path: {}", path.to_string_lossy()))?;
-
-		// open connection to file
-		let path = path.join(format!("{}_{}", attachmend_id, row_id));
-		if path.exists() && !self.force_write {
-			return Err(anyhow!(
-				"Attachment file does already exist: {}. Try -f",
-				path.to_string_lossy()
-			));
-		}
-
-		let mut buffer = std::fs::File::create(&path).with_context(|| {
-			format!("Failed to open attachment file: {}", path.to_string_lossy())
-		})?;
-
-		// write to file
-		buffer.write_all(data).with_context(|| {
-			format!(
-				"Failed to write to attachment file: {}",
-				path.to_string_lossy()
-			)
-		})?;
+		self.write_to_file(
+			"attachment",
+			&format!("{}_{}", attachmend_id, row_id),
+			&data,
+		)?;
 
 		self.count_attachment += 1;
 		self.written_frames += 1;
@@ -146,36 +169,17 @@ impl Output {
 		Ok(())
 	}
 
-	pub fn write_sticker(&mut self, data: &[u8], row_id: u64) -> Result<(), anyhow::Error> {
+	fn write_sticker(&mut self, data: &[u8], row_id: u64) -> Result<(), anyhow::Error> {
 		//let mut path = self.path_sticker.join(format!("{}_{}", row_id, 1));
 		//if path.exists() {
 		//    path = self.path_sticker.join(format!("{}_{}", row_id, 2));
 		//}
 
-		// create path to attachment file
-		let path = self.path_output.join("sticker");
-		std::fs::create_dir_all(&path)
-			.with_context(|| format!("Failed to create path: {}", path.to_string_lossy()))?;
-
-		// open connection to file
-		let path = path.join(format!("{}_{}", row_id, self.count_sticker));
-		if path.exists() && !self.force_write {
-			return Err(anyhow!(
-				"Sticker file does already exist: {}. Try -f",
-				path.to_string_lossy()
-			));
-		}
-
-		let mut buffer = std::fs::File::create(&path)
-			.with_context(|| format!("Failed to open sticker file: {}", path.to_string_lossy()))?;
-
-		// write to file
-		buffer.write_all(data).with_context(|| {
-			format!(
-				"Failed to write to attachment file: {}",
-				path.to_string_lossy()
-			)
-		})?;
+		self.write_to_file(
+			"sticker",
+			&format!("{}_{}", row_id, self.count_sticker),
+			&data,
+		)?;
 
 		self.count_sticker += 1;
 		self.written_frames += 1;
@@ -183,36 +187,13 @@ impl Output {
 		Ok(())
 	}
 
-	pub fn write_avatar(&mut self, data: &[u8], name: &str) -> Result<(), anyhow::Error> {
+	fn write_avatar(&mut self, data: &[u8], name: &str) -> Result<(), anyhow::Error> {
 		//let mut path = self.path_sticker.join(format!("{}_{}", row_id, 1));
 		//if path.exists() {
 		//    path = self.path_sticker.join(format!("{}_{}", row_id, 2));
 		//}
 
-		// create path to attachment file
-		let path = self.path_output.join("avatar");
-		std::fs::create_dir_all(&path)
-			.with_context(|| format!("Failed to create path: {}", path.to_string_lossy()))?;
-
-		// open connection to file
-		let path = path.join(format!("{}_{}", name, self.count_avatar));
-		if path.exists() && !self.force_write {
-			return Err(anyhow!(
-				"Avatar file does already exist: {}. Try -f",
-				path.to_string_lossy()
-			));
-		}
-
-		let mut buffer = std::fs::File::create(&path)
-			.with_context(|| format!("Failed to open avatar file: {}", path.to_string_lossy()))?;
-
-		// write to file
-		buffer.write_all(data).with_context(|| {
-			format!(
-				"Failed to write to attachment file: {}",
-				path.to_string_lossy()
-			)
-		})?;
+		self.write_to_file("avatar", &format!("{}_{}", name, self.count_avatar), &data)?;
 
 		self.count_avatar += 1;
 		self.written_frames += 1;
@@ -220,7 +201,7 @@ impl Output {
 		Ok(())
 	}
 
-	pub fn write_preference(
+	fn write_preference(
 		&mut self,
 		pref: &crate::Backups::SharedPreference,
 	) -> Result<(), anyhow::Error> {
@@ -254,38 +235,17 @@ impl Output {
 		Ok(())
 	}
 
-	pub fn write_version(&mut self, version: u32) -> Result<(), anyhow::Error> {
+	fn write_version(&mut self, version: u32) -> Result<(), anyhow::Error> {
 		info!("Database Version: {:?}", version);
 		self.written_frames += 1;
 		Ok(())
 	}
 
-	pub fn write_frame(&mut self, frame: crate::frame::Frame) -> Result<(), anyhow::Error> {
-		match frame {
-			crate::frame::Frame::Statement {
-				statement,
-				parameter,
-			} => self.write_statement(&statement, &parameter),
-			crate::frame::Frame::Preference { preference } => self.write_preference(&preference),
-			crate::frame::Frame::Attachment { id, row, data, .. } => {
-				self.write_attachment(data.as_ref().unwrap(), id, row)
-			}
-			crate::frame::Frame::Avatar { name, data, .. } => {
-				self.write_avatar(data.as_ref().unwrap(), &name)
-			}
-			crate::frame::Frame::Sticker { row, data, .. } => {
-				self.write_sticker(data.as_ref().unwrap(), row)
-			}
-			crate::frame::Frame::Version { version } => self.write_version(version),
-			_ => Err(anyhow!("unexpected frame found")),
-		}
-	}
-
-	pub fn get_written_frames(&self) -> usize {
+	fn get_written_frames(&self) -> usize {
 		self.written_frames
 	}
 
-	pub fn finish(&mut self) -> Result<(), anyhow::Error> {
+	fn finish(&mut self) -> Result<(), anyhow::Error> {
 		if !self.sqlite_in_memory {
 			return Ok(());
 		}

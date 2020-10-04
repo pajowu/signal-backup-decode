@@ -7,11 +7,28 @@ mod decrypter;
 mod display;
 mod frame;
 mod input;
+mod message;
+mod output;
+mod output_csv;
+mod output_none;
 mod output_raw;
 
 fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	// output
-	let mut output = output_raw::Output::new(&config.path_output_main, true, true)?;
+	let mut output: Box<dyn crate::output::SignalOutput> = match config.output_type {
+		crate::output::SignalOutputType::None => {
+			Box::new(crate::output_none::SignalOutputNone::new())
+		}
+		crate::output::SignalOutputType::Raw => Box::new(crate::output_raw::SignalOutputRaw::new(
+			&config.path_output,
+			config.force_overwrite,
+			config.output_raw_db_in_memory,
+		)?),
+		crate::output::SignalOutputType::Csv => Box::new(crate::output_csv::SignalOutputCsv::new(
+			&config.path_output,
+			config.force_overwrite,
+		)?),
+	};
 
 	// input
 	let mut reader =
@@ -21,6 +38,10 @@ fn run(config: &args::Config) -> Result<(), anyhow::Error> {
 	let progress = display::Progress::new(
 		reader.get_file_size(),
 		reader.get_count_frame().try_into().unwrap(),
+		// don't print progress bars as they are overwritten by debug messages
+		// this implies that only messages of level debug are allowed as long as bars are
+		// active
+		config.log_level == log::Level::Debug,
 	);
 	let progress_read = progress.clone();
 	let progress_write = progress.clone();
@@ -94,7 +115,7 @@ fn main() {
 	});
 
 	simplelog::TermLogger::init(
-		log::LevelFilter::Info,
+		config.log_level,
 		simplelog::Config::default(),
 		simplelog::TerminalMode::Mixed,
 	)

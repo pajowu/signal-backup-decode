@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Context;
 use byteorder::ReadBytesExt;
+use log::{debug, info};
 use std::convert::TryInto;
 use std::io::Read;
 
@@ -20,6 +21,7 @@ impl InputFile {
 		verify_mac: bool,
 	) -> Result<Self, anyhow::Error> {
 		// open file
+		info!("Input file: {}", &path.to_string_lossy());
 		let file = std::fs::File::open(path)
 			.with_context(|| format!("Could not open backup file: {}", path.to_string_lossy()))?;
 		let file_bytes = file.metadata().unwrap().len();
@@ -32,81 +34,95 @@ impl InputFile {
 			.unwrap()
 			.try_into()
 			.unwrap();
-		let mut frame_content = vec![0u8; len];
-		reader.read_exact(&mut frame_content)?;
-		let mut frame =
-			protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
-				.with_context(|| format!("Could not parse frame from {:?}", frame_content))?;
-		let frame = crate::frame::Frame::new(&mut frame);
+		let mut frame = vec![0u8; len];
+		reader.read_exact(&mut frame)?;
+		let frame: crate::frame::Frame = frame.try_into()?;
+		debug!("Frame type: {}", &frame);
 
 		// check that frame is a header and return
-		match frame {
+		match &frame {
 			crate::frame::Frame::Header { salt, iv } => Ok(Self {
 				reader,
 				decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
 				count_frame: 1,
-				count_byte: len,
+				// We already read `len` and 4 bytes with read_u32
+				// There are 16 bytes missing somewhere independent of the input
+				// file. However, I don't know why.
+				count_byte: len + std::mem::size_of::<u32>() + 16,
 				file_bytes,
 			}),
 			_ => Err(anyhow!("first frame is not a header")),
 		}
 	}
 
-	pub fn read_data(&mut self, length: usize) -> Result<Vec<u8>, anyhow::Error> {
-		let mut bytes_left = length;
-		let mut attachment_data = std::vec::Vec::with_capacity(length - 10);
-		let mut attachment_hmac = [0u8; 10];
+	fn read_data(
+		&mut self,
+		length: usize,
+		read_attachment: bool,
+	) -> Result<Vec<u8>, anyhow::Error> {
+		let mut hmac = [0u8; crate::decrypter::LENGTH_HMAC];
+		let mut data;
 
-		self.decrypter.mac_update_with_iv();
-
-		while bytes_left > 0 {
-			let mut buffer = vec![0u8; std::cmp::min(bytes_left, 8192)];
-			self.reader.read_exact(&mut buffer)?;
-			bytes_left -= buffer.len();
-			self.decrypter.decrypt(&mut buffer);
-			attachment_data.append(&mut buffer);
+		// Reading files (attachments) need an update of MAC with IV.
+		// And their given length corresponds to file length but frame length corresponds
+		// to data length + hmac data.
+		if read_attachment {
+			self.decrypter.mac_update_with_iv();
+			data = vec![0u8; length];
+		} else {
+			data = vec![0u8; length - crate::decrypter::LENGTH_HMAC];
 		}
 
-		self.reader.read_exact(&mut attachment_hmac)?;
-		self.decrypter.verify_mac(&attachment_hmac)?;
+		// read data and decrypt
+		self.reader.read_exact(&mut data)?;
+		let data = self.decrypter.decrypt(&mut data);
+
+		// read hmac
+		self.reader.read_exact(&mut hmac)?;
+
+		// verify mac
+		self.decrypter.verify_mac(&hmac)?;
 		self.decrypter.increase_iv();
 
-		self.count_byte += length;
-		Ok(attachment_data)
+		if read_attachment {
+			// we got file length, so we have to add 10 bytes for hmac data
+			self.count_byte += length + crate::decrypter::LENGTH_HMAC;
+		} else {
+			// in the case of frames, we add 4 bytes we have read to determine frame length
+			// (hmac data is already in length included)
+			self.count_byte += length + std::mem::size_of::<u32>();
+		}
+
+		Ok(data)
 	}
 
 	pub fn read_frame(&mut self) -> Result<crate::frame::Frame, anyhow::Error> {
-		// read data from input file
+		// read frame length from input file
 		let len: usize = self
 			.reader
 			.read_u32::<byteorder::BigEndian>()
 			.unwrap()
 			.try_into()
 			.unwrap();
-		let mut frame_content = vec![0u8; len - 10];
-		let mut frame_hmac = [0u8; 10];
-
-		self.reader.read_exact(&mut frame_content)?;
-		self.reader.read_exact(&mut frame_hmac)?;
-		self.decrypter.decrypt(&mut frame_content);
-		self.decrypter.verify_mac(&frame_hmac)?;
-		self.decrypter.increase_iv();
+		debug!(
+			"Read frame number {} with length of {} bytes",
+			self.count_frame, len
+		);
 
 		// create frame
-		let mut frame =
-			protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&frame_content)
-				.with_context(|| format!("Could not parse frame from {:?}", frame_content))?;
-		let mut frame = crate::frame::Frame::new(&mut frame);
+		let frame = self.read_data(len, false)?;
+		let mut frame: crate::frame::Frame = frame.try_into()?;
+		debug!("Frame type: {}", &frame);
 
 		match frame {
 			crate::frame::Frame::Attachment { data_length, .. } => {
-				frame.set_data(self.read_data(data_length)?);
+				frame.set_data(self.read_data(data_length, true)?);
 			}
 			crate::frame::Frame::Avatar { data_length, .. } => {
-				frame.set_data(self.read_data(data_length)?);
+				frame.set_data(self.read_data(data_length, true)?);
 			}
 			crate::frame::Frame::Sticker { data_length, .. } => {
-				frame.set_data(self.read_data(data_length)?);
+				frame.set_data(self.read_data(data_length, true)?);
 			}
 			crate::frame::Frame::Header { .. } => return Err(anyhow!("unexpected header found")),
 			_ => (),
@@ -114,7 +130,6 @@ impl InputFile {
 
 		// clean up and return
 		self.count_frame += 1;
-		self.count_byte += len;
 		Ok(frame)
 	}
 
