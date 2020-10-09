@@ -1,6 +1,6 @@
 [package]
 name = "signal-backup-decode"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["pajowu <pajowu@pajowu.de>"]
 build = "build.rs"
 description = "A simple tool to decode signal backups"
@@ -10,7 +10,7 @@ repository = "https://github.com/pajowu/signal-backup-decode"
 edition = "2018"
 
 [dependencies]
-protobuf = "^2.14"
+protobuf = "=2.14"
 byteorder = "^1"
 rust-ini = "^0.15"
 clap = "^2.33"
