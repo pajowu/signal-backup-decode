@@ -125,7 +125,6 @@ impl std::fmt::Display for DecryptError {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use aes_ctr::stream_cipher::NewStreamCipher;
 
 	#[test]
 	fn increase_iv() {
