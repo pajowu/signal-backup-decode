@@ -1,6 +1,6 @@
 [package]
 name = "signal-backup-decode"
-version = "0.1.5"
+version = "0.2.1"
 authors = ["pajowu <pajowu@pajowu.de>"]
 build = "build.rs"
 description = "A simple tool to decode signal backups"
@@ -10,19 +10,28 @@ repository = "https://github.com/pajowu/signal-backup-decode"
 edition = "2018"
 
 [dependencies]
-openssl = "~0.10"
-hex = "~0.3"
-protobuf = "~2.14"
-byteorder = "~1"
-rust-crypto = "~0.2"
-error-chain = "~0.12"
-sqlite = "~0.25"
-rust-ini = "~0.15"
-clap = "~2.33"
-tempfile = "~3"
+protobuf = "=2.14"
+byteorder = "^1"
+rust-ini = "^0.15"
+clap = "^2.33"
+simplelog = "^0.8"
+anyhow = "^1.0"
+log = "^0.4"
+rusqlite = "^0.23"
+hkdf = "^0.9"
+sha2 = "^0.9"
+hmac = "^0.8"
+generic-array = "^0.14"
+subtle = "^2.2"
+indicatif = "^0.15"
+infer = "^0.2"
+csv = "^1.1"
+serde = { version = "^1.0", features = ["derive"] }
+chrono = { version = "^0.4", features = ["serde"] }
+openssl = "^0.10"
 
 [build-dependencies]
-protoc-rust = {version = "~2.14", optional = true}
+protoc-rust = {version = "^2.14", optional = true}
 
 [features]
 default = []
