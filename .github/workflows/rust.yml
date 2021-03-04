@@ -1,0 +1,36 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check_and_test_stable:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+          toolchain: stable
+
+    - name: Check against current compiler        
+      run: cargo check --verbose
+    - name: Run tests against current compiler
+      run: cargo test --verbose
+  check_and_test_1_41:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+          toolchain: 1.41
+
+    - name: Check against current compiler        
+      run: cargo check --verbose
+    - name: Run tests against current compiler
+      run: cargo test --verbose

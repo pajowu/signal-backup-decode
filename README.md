@@ -2,6 +2,7 @@
 
 This repository contains a small programm to decode a backup produced by [Signal Android](https://github.com/signalapp/Signal-Android).
 
+
 ## Installation
 
 **Rust v1.41 or higher is required**
@@ -9,6 +10,45 @@ This repository contains a small programm to decode a backup produced by [Signal
 ```
 cargo install signal-backup-decode
 ```
+
+
+## Usage
+
+This tool is run as `signal-backup-decode`. See `signal-backup-decode --help`:
+
+```
+signal-backup-decode 0.2.1
+pajowu <pajowu@pajowu.de>
+A simple tool to decode signal backups
+
+USAGE:
+    signal-backup-decode [FLAGS] [OPTIONS] <INPUT> <--password <PASSWORD>|--password-file <FILE>|--password-command <COMMAND>>
+
+FLAGS:
+    -f, --force              Overwrite existing output files
+    -h, --help               Prints help information
+        --no-in-memory-db    Do not use in memory sqlite database. Database is immediately created on disk (only
+                             considered with output type RAW).
+        --no-verify-mac      Do not verify the HMAC of each frame in the backup
+    -V, --version            Prints version information
+
+OPTIONS:
+    -v, --verbosity <LEVEL>             Verbosity level, either DEBUG, INFO, WARN, or ERROR
+    -o, --output-path <FOLDER>          Directory to save output to. If not given, input file directory is used
+    -t, --output-type <TYPE>            Output type, either RAW, CSV or NONE
+        --password-command <COMMAND>    Read backup password from stdout from COMMAND
+        --password-file <FILE>          File to read the backup password from
+    -p, --password <PASSWORD>           Backup password (30 digits, with or without spaces)
+
+ARGS:
+    <INPUT>    Sets the input file to use
+```
+
+If you want to overwrite an existing backup, use the `-f` flag. Output type 
+`NONE` can be useful to check the backup file for corrupted frames but no 
+output is written to disk. Only the first line is read from 
+`--password-command` and `--password-file`.
+
 
 ## Feature Flags
 
@@ -25,39 +65,6 @@ Once `protoc` is installed, this tool can be installed using `cargo`:
 cargo install --features "rebuild-protobuf" signal-backup-decode
 ```
 
-
-## Usage
-
-This tool is run as `signal-backup-decode`. See `signal-backup-decode --help`:
-
-```
-signal-backup-decode [FLAGS] [OPTIONS] <INPUT> --sqlite-path <sqlite_path> <--password <PASSWORD>|--password_file <FILE>>
-pajowu <pajowu@pajowu.de>
-A simple tool to decode signal backups
-
-USAGE:
-    signal-backup-decode [FLAGS] [OPTIONS] <INPUT> --sqlite-path <sqlite_path> <--password <PASSWORD>|--password_file <FILE>>
-
-FLAGS:
-    -h, --help             Prints help information
-        --no-tmp-sqlite    Do not use a temporary file for the sqlite database
-        --no-verify-mac    Do not verify the HMAC of each frame in the backup
-    -V, --version          Prints version information
-
-OPTIONS:
-        --attachment-path <attachment_path>    Directory to save attachments to [default: attachments]
-        --avatar-path <avatar_path>            Directory to save avatar images to [default: avatars]
-        --config-path <config_path>            Directory to save config files to [default: config]
-    -o, --output-path <FOLDER>                 Directory to save output to
-    -f, --password_file <FILE>                 File to read the Backup password from
-    -p, --password <PASSWORD>                  Backup password (30 digits, with or without spaces)
-        --sqlite-path <sqlite_path>            File to store the sqlite database in [default:
-                                               output_path/signal_backup.db]
-
-ARGS:
-    <INPUT>    Sets the input file to use
-
-```
 
 ## License
 
