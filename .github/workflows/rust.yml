@@ -30,7 +30,7 @@ jobs:
       with:
           toolchain: 1.41
 
-    - name: Check against current compiler        
+    - name: Check against rust 1.41
       run: cargo check --verbose
-    - name: Run tests against current compiler
+    - name: Run tests against rust 1.41
       run: cargo test --verbose
