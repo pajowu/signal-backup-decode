@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check_and_test_stable:
+  build_and_test_stable:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -18,11 +18,11 @@ jobs:
       with:
           toolchain: stable
 
-    - name: Check against current compiler        
-      run: cargo check --verbose
+    - name: Build against current compiler        
+      run: cargo build --verbose
     - name: Run tests against current compiler
       run: cargo test --verbose
-  check_and_test_1_41:
+  build_and_test_1_41:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -30,7 +30,7 @@ jobs:
       with:
           toolchain: 1.41
 
-    - name: Check against rust 1.41
-      run: cargo check --verbose
+    - name: Build against rust 1.41
+      run: cargo build --verbose
     - name: Run tests against rust 1.41
       run: cargo test --verbose
