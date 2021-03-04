@@ -11,6 +11,12 @@ This repository contains a small programm to decode a backup produced by [Signal
 cargo install signal-backup-decode
 ```
 
+On Debian/Ubuntu you will need the following packages:
+
+```
+sudo apt install libsqlite3-dev libssl-dev pkg-config
+```
+
 
 ## Usage
 
