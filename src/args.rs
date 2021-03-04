@@ -139,15 +139,23 @@ impl Config {
 					.context("Unable to read from password file")?
 			} else if matches.is_present("password-command") {
 				let shell = std::env::var("SHELL").context("Could not determine current shell")?;
-				String::from_utf8(
-					std::process::Command::new(shell)
-						.arg("-c")
-						.arg(matches.value_of("password-command").unwrap())
-						.output()
-						.context("Failed to execute password command")?
-						.stdout,
-				)
-				.context("Password command returned invalid characters")?
+				let output = std::process::Command::new(shell)
+					.arg("-c")
+					.arg(matches.value_of("password-command").unwrap())
+					.output()
+					.context("Failed to execute password command")?;
+
+				// check whether command returned an error code
+				if output.status.success() {
+					String::from_utf8(output.stdout)
+						.context("Password command returned invalid characters")?
+						.lines()
+						.next()
+						.context("Password command returned empty line")?
+						.into()
+				} else {
+					return Err(anyhow!("Password command returned error code"));
+				}
 			} else {
 				unreachable!()
 			}
