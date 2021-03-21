@@ -34,6 +34,16 @@ pub enum Frame {
 		row: u64,
 		data: Option<Vec<u8>>,
 	},
+	KeyValue {
+		key_value: crate::Backups::KeyValue
+		    // optional string key          = 1;
+    // optional bytes  blobValue    = 2;
+    // optional bool   booleanValue = 3;
+    // optional float  floatValue   = 4;
+    // optional int32  integerValue = 5;
+    // optional int64  longValue    = 6;
+    // optional string stringValue  = 7;
+	}
 }
 
 impl Frame {
@@ -127,6 +137,14 @@ impl Frame {
 			});
 		};
 
+		if frame.has_keyValue() {
+			fields_count += 1;
+			let key_value = frame.take_keyValue();
+			ret = Some(Self::KeyValue {
+				key_value
+			});
+		};
+
 		if fields_count != 1 {
 			panic!(
 				"Frame with an unsupported number of fields found, please report to author: {:?}",
@@ -165,6 +183,7 @@ impl std::fmt::Display for Frame {
 			Self::Statement { .. } => write!(f, "Statement"),
 			Self::Version { version } => write!(f, "Version ({})", version),
 			Self::End => write!(f, "End"),
+			Self::KeyValue { .. } => write!(f, "KeyValue"),
 		}
 	}
 }

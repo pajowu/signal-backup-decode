@@ -241,6 +241,11 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 		Ok(())
 	}
 
+	fn write_key_value(&mut self, key_value: &crate::Backups::KeyValue) ->  Result<(), anyhow::Error>{
+		self.written_frames += 1;
+		Ok(())
+	}
+
 	fn get_written_frames(&self) -> usize {
 		self.written_frames
 	}

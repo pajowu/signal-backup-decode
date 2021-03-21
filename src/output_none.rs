@@ -69,6 +69,11 @@ impl crate::output::SignalOutput for SignalOutputNone {
 		self.written_frames
 	}
 
+	fn write_key_value(&mut self, key_value: &crate::Backups::KeyValue) ->  Result<(), anyhow::Error>{
+		self.written_frames += 1;
+		Ok(())
+	}
+
 	fn finish(&mut self) -> Result<(), anyhow::Error> {
 		Ok(())
 	}
