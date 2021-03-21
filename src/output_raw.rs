@@ -16,6 +16,7 @@ pub struct SignalOutputRaw {
 	count_sticker: usize,
 	count_avatar: usize,
 	written_frames: usize,
+	created_files: std::boxed::Box<std::collections::HashSet<std::path::PathBuf>>
 }
 
 impl SignalOutputRaw {
@@ -82,6 +83,7 @@ impl SignalOutputRaw {
 			count_avatar: 0,
 			// we set read frames to 1 due to the header frame we will never write
 			written_frames: 1,
+			created_files: std::boxed::Box::new(std::collections::HashSet::new())
 		})
 	}
 
@@ -212,7 +214,7 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 
 		// open connection to file
 		let path = path.join(pref.get_file());
-		if path.exists() && !self.force_write {
+		if path.exists() && !self.force_write && !self.created_files.contains(&path) {
 			return Err(anyhow!(
 				"Config file does already exist: {}. Try -f",
 				path.to_string_lossy()
@@ -230,6 +232,7 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 			)
 		})?;
 
+		self.created_files.insert(path);
 		self.written_frames += 1;
 
 		Ok(())
