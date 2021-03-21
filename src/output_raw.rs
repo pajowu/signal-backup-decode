@@ -62,7 +62,7 @@ impl SignalOutputRaw {
 
 		let sqlite_connection = if open_db_in_memory {
 			rusqlite::Connection::open_in_memory()
-				.with_context(|| "could not open connection to in memory database".to_string(),)?
+				.with_context(|| "could not open connection to in memory database".to_string())?
 		} else {
 			rusqlite::Connection::open(&path_sqlite).with_context(|| {
 				format!(
@@ -100,7 +100,7 @@ impl SignalOutputRaw {
 		let mut path = path.join(filename);
 		let infer = infer::Infer::new();
 		if let Some(x) = infer.get(&data) {
-			path.set_extension(x.ext);
+			path.set_extension(x.extension());
 		}
 
 		if path.exists() && !self.force_write {

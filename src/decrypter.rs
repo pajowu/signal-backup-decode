@@ -90,7 +90,7 @@ impl Decrypter {
 	// TODO what is happening here?
 	pub fn increase_iv(&mut self) {
 		for v in self.iv.iter_mut().take(4).rev() {
-			if *v < u8::MAX {
+			if *v < std::u8::MAX {
 				*v += 1;
 				break;
 			} else {
@@ -125,7 +125,6 @@ impl std::fmt::Display for DecryptError {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use aes_ctr::stream_cipher::NewStreamCipher;
 
 	#[test]
 	fn increase_iv() {

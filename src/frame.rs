@@ -192,7 +192,7 @@ impl std::convert::TryFrom<Vec<u8>> for Frame {
 	type Error = anyhow::Error;
 
 	fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
-		let mut frame = protobuf::parse_from_bytes::<crate::Backups::BackupFrame>(&data)
+		let mut frame = protobuf::Message::parse_from_bytes(&data)
 			.with_context(|| format!("Could not parse frame from {:02X?}", &data))?;
 		Ok(Self::new(&mut frame))
 	}
