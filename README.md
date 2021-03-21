@@ -5,7 +5,9 @@ This repository contains a small programm to decode a backup produced by [Signal
 
 ## Installation
 
-**Rust v1.41 or higher is required**
+**Rust v1.41 or higher is required**. Install 
+[rust](https://www.rust-lang.org/tools/install) first and then execute the 
+following command in a terminal:
 
 ```
 cargo install signal-backup-decode

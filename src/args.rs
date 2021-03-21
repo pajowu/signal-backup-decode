@@ -162,6 +162,11 @@ impl Config {
 		};
 		password.retain(|c| c >= '0' && c <= '9');
 		let password = password.as_bytes().to_vec();
+		if password.len() != 30 {
+			return Err(anyhow!(
+				"Wrong password length (30 numeric characters are expected)"
+			));
+		}
 
 		// verbosity handling
 		let log_level = if let Some(x) = matches.value_of("log-level") {
