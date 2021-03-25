@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use anyhow::Context;
 use std::convert::TryInto;
 
@@ -50,24 +51,23 @@ pub enum KeyValueContent {
 }
 
 impl Frame {
-	pub fn new(frame: &mut crate::Backups::BackupFrame) -> Self {
+	pub fn new(frame: &mut crate::Backups::BackupFrame) -> Result<Self, anyhow::Error> {
 		let mut fields_count = 0;
-		// TODO: remove option here
-		let mut ret: Option<Self> = None;
+		let mut ret: Self = Self::End;
 
 		if frame.has_header() {
 			fields_count += 1;
 			let mut header = frame.take_header();
-			ret = Some(Self::Header {
+			ret = Self::Header {
 				salt: header.take_salt(),
 				iv: header.take_iv(),
-			});
+			};
 		};
 
 		if frame.has_statement() {
 			fields_count += 1;
 			let mut statement = frame.take_statement();
-			ret = Some(Self::Statement {
+			ret = Self::Statement {
 				statement: statement.take_statement(),
 				parameter: {
 					let mut params: Vec<rusqlite::types::Value> = Vec::new();
@@ -88,57 +88,57 @@ impl Frame {
 					}
 					params
 				},
-			});
+			};
 		};
 
 		if frame.has_preference() {
 			fields_count += 1;
-			ret = Some(Self::Preference {
+			ret = Self::Preference {
 				preference: frame.take_preference(),
-			});
+			};
 		};
 
 		if frame.has_attachment() {
 			fields_count += 1;
 			let attachment = frame.take_attachment();
-			ret = Some(Self::Attachment {
+			ret = Self::Attachment {
 				data_length: attachment.get_length().try_into().unwrap(),
 				id: attachment.get_attachmentId(),
 				row: attachment.get_rowId(),
 				data: None,
-			});
+			};
 		};
 
 		if frame.has_version() {
 			fields_count += 1;
-			ret = Some(Self::Version {
+			ret = Self::Version {
 				version: frame.get_version().get_version(),
-			});
+			};
 		};
 
 		if frame.has_end() {
 			fields_count += 1;
-			ret = Some(Self::End);
+			// changing is not necessary here. ret is already set to Self::End
 		};
 
 		if frame.has_avatar() {
 			fields_count += 1;
 			let mut avatar = frame.take_avatar();
-			ret = Some(Self::Avatar {
+			ret = Self::Avatar {
 				data_length: avatar.get_length().try_into().unwrap(),
 				name: avatar.take_name(),
 				data: None,
-			});
+			};
 		};
 
 		if frame.has_sticker() {
 			fields_count += 1;
 			let sticker = frame.take_sticker();
-			ret = Some(Self::Sticker {
+			ret = Self::Sticker {
 				data_length: sticker.get_length().try_into().unwrap(),
 				row: sticker.get_rowId(),
 				data: None,
-			});
+			};
 		};
 
 		if frame.has_keyValue() {
@@ -160,20 +160,20 @@ impl Frame {
 				unreachable!()
 			};
 
-			ret = Some(Self::KeyValue {
+			ret = Self::KeyValue {
 				key: keyvalue.take_key(),
 				value,
-			});
+			};
 		};
 
 		if fields_count != 1 {
-			panic!(
+			Err(anyhow!(
 				"Frame with an unsupported number of fields found, please report to author: {:?}",
 				frame
-			);
-		};
-
-		ret.unwrap()
+			))
+		} else {
+			Ok(ret)
+		}
 	}
 
 	pub fn set_data(&mut self, data_add: Vec<u8>) {
@@ -204,7 +204,7 @@ impl std::fmt::Display for Frame {
 			Self::Statement { .. } => write!(f, "Statement"),
 			Self::Version { version } => write!(f, "Version ({})", version),
 			Self::End => write!(f, "End"),
-			Self::KeyValue { .. } => write!(f, "KeyValue"),
+			Self::KeyValue { key, value } => write!(f, "KeyValue: {} = {:?}", key, value),
 		}
 	}
 }
@@ -215,6 +215,6 @@ impl std::convert::TryFrom<Vec<u8>> for Frame {
 	fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
 		let mut frame = protobuf::Message::parse_from_bytes(&data)
 			.with_context(|| format!("Could not parse frame from {:02X?}", &data))?;
-		Ok(Self::new(&mut frame))
+		Self::new(&mut frame)
 	}
 }
