@@ -26,7 +26,11 @@ pub trait SignalOutput: Send {
 
 	fn write_version(&mut self, version: u32) -> Result<(), anyhow::Error>;
 
-	fn write_key_value(&mut self, key_value: &crate::Backups::KeyValue) ->  Result<(), anyhow::Error>;
+	fn write_keyvalue(
+		&mut self,
+		key: &str,
+		value: &crate::frame::KeyValueContent,
+	) -> Result<(), anyhow::Error>;
 
 	fn get_written_frames(&self) -> usize;
 
@@ -47,7 +51,7 @@ pub trait SignalOutput: Send {
 				self.write_sticker(data.as_ref().unwrap(), row)
 			}
 			crate::frame::Frame::Version { version } => self.write_version(version),
-			crate::frame::Frame::KeyValue { key_value } => self.write_key_value(&key_value),
+			crate::frame::Frame::KeyValue { key, value } => self.write_keyvalue(&key, &value),
 			_ => Err(anyhow!("unexpected frame found")),
 		}
 	}

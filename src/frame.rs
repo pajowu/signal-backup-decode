@@ -35,20 +35,24 @@ pub enum Frame {
 		data: Option<Vec<u8>>,
 	},
 	KeyValue {
-		key_value: crate::Backups::KeyValue
-		    // optional string key          = 1;
-    // optional bytes  blobValue    = 2;
-    // optional bool   booleanValue = 3;
-    // optional float  floatValue   = 4;
-    // optional int32  integerValue = 5;
-    // optional int64  longValue    = 6;
-    // optional string stringValue  = 7;
-	}
+		key: String,
+		value: KeyValueContent,
+	},
+}
+
+#[derive(Debug)]
+pub enum KeyValueContent {
+	Blob(Vec<u8>),
+	Bool(bool),
+	Float(f32),
+	Int(i64),
+	String(String),
 }
 
 impl Frame {
 	pub fn new(frame: &mut crate::Backups::BackupFrame) -> Self {
 		let mut fields_count = 0;
+		// TODO: remove option here
 		let mut ret: Option<Self> = None;
 
 		if frame.has_header() {
@@ -139,9 +143,26 @@ impl Frame {
 
 		if frame.has_keyValue() {
 			fields_count += 1;
-			let key_value = frame.take_keyValue();
+			let mut keyvalue = frame.take_keyValue();
+			let value = if keyvalue.has_blobValue() {
+				KeyValueContent::Blob(keyvalue.take_blobValue())
+			} else if keyvalue.has_booleanValue() {
+				KeyValueContent::Bool(keyvalue.get_booleanValue())
+			} else if keyvalue.has_floatValue() {
+				KeyValueContent::Float(keyvalue.get_floatValue())
+			} else if keyvalue.has_integerValue() {
+				KeyValueContent::Int(keyvalue.get_integerValue().into())
+			} else if keyvalue.has_longValue() {
+				KeyValueContent::Int(keyvalue.get_longValue())
+			} else if keyvalue.has_stringValue() {
+				KeyValueContent::String(keyvalue.take_stringValue())
+			} else {
+				unreachable!()
+			};
+
 			ret = Some(Self::KeyValue {
-				key_value
+				key: keyvalue.take_key(),
+				value,
 			});
 		};
 
