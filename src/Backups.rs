@@ -585,6 +585,9 @@ pub struct SharedPreference {
     file: ::protobuf::SingularField<::std::string::String>,
     key: ::protobuf::SingularField<::std::string::String>,
     value: ::protobuf::SingularField<::std::string::String>,
+    booleanValue: ::std::option::Option<bool>,
+    pub stringSetValue: ::protobuf::RepeatedField<::std::string::String>,
+    isStringSetValue: ::std::option::Option<bool>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -708,6 +711,69 @@ impl SharedPreference {
     pub fn take_value(&mut self) -> ::std::string::String {
         self.value.take().unwrap_or_else(|| ::std::string::String::new())
     }
+
+    // optional bool booleanValue = 4;
+
+
+    pub fn get_booleanValue(&self) -> bool {
+        self.booleanValue.unwrap_or(false)
+    }
+    pub fn clear_booleanValue(&mut self) {
+        self.booleanValue = ::std::option::Option::None;
+    }
+
+    pub fn has_booleanValue(&self) -> bool {
+        self.booleanValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_booleanValue(&mut self, v: bool) {
+        self.booleanValue = ::std::option::Option::Some(v);
+    }
+
+    // repeated string stringSetValue = 5;
+
+
+    pub fn get_stringSetValue(&self) -> &[::std::string::String] {
+        &self.stringSetValue
+    }
+    pub fn clear_stringSetValue(&mut self) {
+        self.stringSetValue.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_stringSetValue(&mut self, v: ::protobuf::RepeatedField<::std::string::String>) {
+        self.stringSetValue = v;
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_stringSetValue(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.stringSetValue
+    }
+
+    // Take field
+    pub fn take_stringSetValue(&mut self) -> ::protobuf::RepeatedField<::std::string::String> {
+        ::std::mem::replace(&mut self.stringSetValue, ::protobuf::RepeatedField::new())
+    }
+
+    // optional bool isStringSetValue = 6;
+
+
+    pub fn get_isStringSetValue(&self) -> bool {
+        self.isStringSetValue.unwrap_or(false)
+    }
+    pub fn clear_isStringSetValue(&mut self) {
+        self.isStringSetValue = ::std::option::Option::None;
+    }
+
+    pub fn has_isStringSetValue(&self) -> bool {
+        self.isStringSetValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_isStringSetValue(&mut self, v: bool) {
+        self.isStringSetValue = ::std::option::Option::Some(v);
+    }
 }
 
 impl ::protobuf::Message for SharedPreference {
@@ -727,6 +793,23 @@ impl ::protobuf::Message for SharedPreference {
                 },
                 3 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.value)?;
+                },
+                4 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_bool()?;
+                    self.booleanValue = ::std::option::Option::Some(tmp);
+                },
+                5 => {
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.stringSetValue)?;
+                },
+                6 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_bool()?;
+                    self.isStringSetValue = ::std::option::Option::Some(tmp);
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -749,6 +832,15 @@ impl ::protobuf::Message for SharedPreference {
         if let Some(ref v) = self.value.as_ref() {
             my_size += ::protobuf::rt::string_size(3, &v);
         }
+        if let Some(v) = self.booleanValue {
+            my_size += 2;
+        }
+        for value in &self.stringSetValue {
+            my_size += ::protobuf::rt::string_size(5, &value);
+        };
+        if let Some(v) = self.isStringSetValue {
+            my_size += 2;
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -763,6 +855,15 @@ impl ::protobuf::Message for SharedPreference {
         }
         if let Some(ref v) = self.value.as_ref() {
             os.write_string(3, &v)?;
+        }
+        if let Some(v) = self.booleanValue {
+            os.write_bool(4, v)?;
+        }
+        for v in &self.stringSetValue {
+            os.write_string(5, &v)?;
+        };
+        if let Some(v) = self.isStringSetValue {
+            os.write_bool(6, v)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -817,6 +918,21 @@ impl ::protobuf::Message for SharedPreference {
                 |m: &SharedPreference| { &m.value },
                 |m: &mut SharedPreference| { &mut m.value },
             ));
+            fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                "booleanValue",
+                |m: &SharedPreference| { &m.booleanValue },
+                |m: &mut SharedPreference| { &mut m.booleanValue },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                "stringSetValue",
+                |m: &SharedPreference| { &m.stringSetValue },
+                |m: &mut SharedPreference| { &mut m.stringSetValue },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                "isStringSetValue",
+                |m: &SharedPreference| { &m.isStringSetValue },
+                |m: &mut SharedPreference| { &mut m.isStringSetValue },
+            ));
             ::protobuf::reflect::MessageDescriptor::new_pb_name::<SharedPreference>(
                 "SharedPreference",
                 fields,
@@ -836,6 +952,9 @@ impl ::protobuf::Clear for SharedPreference {
         self.file.clear();
         self.key.clear();
         self.value.clear();
+        self.booleanValue = ::std::option::Option::None;
+        self.stringSetValue.clear();
+        self.isStringSetValue = ::std::option::Option::None;
         self.unknown_fields.clear();
     }
 }
@@ -1919,6 +2038,435 @@ impl ::protobuf::reflect::ProtobufValue for Header {
 }
 
 #[derive(PartialEq,Clone,Default)]
+pub struct KeyValue {
+    // message fields
+    key: ::protobuf::SingularField<::std::string::String>,
+    blobValue: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    booleanValue: ::std::option::Option<bool>,
+    floatValue: ::std::option::Option<f32>,
+    integerValue: ::std::option::Option<i32>,
+    longValue: ::std::option::Option<i64>,
+    stringValue: ::protobuf::SingularField<::std::string::String>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a KeyValue {
+    fn default() -> &'a KeyValue {
+        <KeyValue as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl KeyValue {
+    pub fn new() -> KeyValue {
+        ::std::default::Default::default()
+    }
+
+    // optional string key = 1;
+
+
+    pub fn get_key(&self) -> &str {
+        match self.key.as_ref() {
+            Some(v) => &v,
+            None => "",
+        }
+    }
+    pub fn clear_key(&mut self) {
+        self.key.clear();
+    }
+
+    pub fn has_key(&self) -> bool {
+        self.key.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_key(&mut self, v: ::std::string::String) {
+        self.key = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_key(&mut self) -> &mut ::std::string::String {
+        if self.key.is_none() {
+            self.key.set_default();
+        }
+        self.key.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_key(&mut self) -> ::std::string::String {
+        self.key.take().unwrap_or_else(|| ::std::string::String::new())
+    }
+
+    // optional bytes blobValue = 2;
+
+
+    pub fn get_blobValue(&self) -> &[u8] {
+        match self.blobValue.as_ref() {
+            Some(v) => &v,
+            None => &[],
+        }
+    }
+    pub fn clear_blobValue(&mut self) {
+        self.blobValue.clear();
+    }
+
+    pub fn has_blobValue(&self) -> bool {
+        self.blobValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_blobValue(&mut self, v: ::std::vec::Vec<u8>) {
+        self.blobValue = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_blobValue(&mut self) -> &mut ::std::vec::Vec<u8> {
+        if self.blobValue.is_none() {
+            self.blobValue.set_default();
+        }
+        self.blobValue.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_blobValue(&mut self) -> ::std::vec::Vec<u8> {
+        self.blobValue.take().unwrap_or_else(|| ::std::vec::Vec::new())
+    }
+
+    // optional bool booleanValue = 3;
+
+
+    pub fn get_booleanValue(&self) -> bool {
+        self.booleanValue.unwrap_or(false)
+    }
+    pub fn clear_booleanValue(&mut self) {
+        self.booleanValue = ::std::option::Option::None;
+    }
+
+    pub fn has_booleanValue(&self) -> bool {
+        self.booleanValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_booleanValue(&mut self, v: bool) {
+        self.booleanValue = ::std::option::Option::Some(v);
+    }
+
+    // optional float floatValue = 4;
+
+
+    pub fn get_floatValue(&self) -> f32 {
+        self.floatValue.unwrap_or(0.)
+    }
+    pub fn clear_floatValue(&mut self) {
+        self.floatValue = ::std::option::Option::None;
+    }
+
+    pub fn has_floatValue(&self) -> bool {
+        self.floatValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_floatValue(&mut self, v: f32) {
+        self.floatValue = ::std::option::Option::Some(v);
+    }
+
+    // optional int32 integerValue = 5;
+
+
+    pub fn get_integerValue(&self) -> i32 {
+        self.integerValue.unwrap_or(0)
+    }
+    pub fn clear_integerValue(&mut self) {
+        self.integerValue = ::std::option::Option::None;
+    }
+
+    pub fn has_integerValue(&self) -> bool {
+        self.integerValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_integerValue(&mut self, v: i32) {
+        self.integerValue = ::std::option::Option::Some(v);
+    }
+
+    // optional int64 longValue = 6;
+
+
+    pub fn get_longValue(&self) -> i64 {
+        self.longValue.unwrap_or(0)
+    }
+    pub fn clear_longValue(&mut self) {
+        self.longValue = ::std::option::Option::None;
+    }
+
+    pub fn has_longValue(&self) -> bool {
+        self.longValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_longValue(&mut self, v: i64) {
+        self.longValue = ::std::option::Option::Some(v);
+    }
+
+    // optional string stringValue = 7;
+
+
+    pub fn get_stringValue(&self) -> &str {
+        match self.stringValue.as_ref() {
+            Some(v) => &v,
+            None => "",
+        }
+    }
+    pub fn clear_stringValue(&mut self) {
+        self.stringValue.clear();
+    }
+
+    pub fn has_stringValue(&self) -> bool {
+        self.stringValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_stringValue(&mut self, v: ::std::string::String) {
+        self.stringValue = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_stringValue(&mut self) -> &mut ::std::string::String {
+        if self.stringValue.is_none() {
+            self.stringValue.set_default();
+        }
+        self.stringValue.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_stringValue(&mut self) -> ::std::string::String {
+        self.stringValue.take().unwrap_or_else(|| ::std::string::String::new())
+    }
+}
+
+impl ::protobuf::Message for KeyValue {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.key)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.blobValue)?;
+                },
+                3 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_bool()?;
+                    self.booleanValue = ::std::option::Option::Some(tmp);
+                },
+                4 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeFixed32 {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_float()?;
+                    self.floatValue = ::std::option::Option::Some(tmp);
+                },
+                5 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_int32()?;
+                    self.integerValue = ::std::option::Option::Some(tmp);
+                },
+                6 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_int64()?;
+                    self.longValue = ::std::option::Option::Some(tmp);
+                },
+                7 => {
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.stringValue)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if let Some(ref v) = self.key.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
+        }
+        if let Some(ref v) = self.blobValue.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(2, &v);
+        }
+        if let Some(v) = self.booleanValue {
+            my_size += 2;
+        }
+        if let Some(v) = self.floatValue {
+            my_size += 5;
+        }
+        if let Some(v) = self.integerValue {
+            my_size += ::protobuf::rt::value_size(5, v, ::protobuf::wire_format::WireTypeVarint);
+        }
+        if let Some(v) = self.longValue {
+            my_size += ::protobuf::rt::value_size(6, v, ::protobuf::wire_format::WireTypeVarint);
+        }
+        if let Some(ref v) = self.stringValue.as_ref() {
+            my_size += ::protobuf::rt::string_size(7, &v);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if let Some(ref v) = self.key.as_ref() {
+            os.write_string(1, &v)?;
+        }
+        if let Some(ref v) = self.blobValue.as_ref() {
+            os.write_bytes(2, &v)?;
+        }
+        if let Some(v) = self.booleanValue {
+            os.write_bool(3, v)?;
+        }
+        if let Some(v) = self.floatValue {
+            os.write_float(4, v)?;
+        }
+        if let Some(v) = self.integerValue {
+            os.write_int32(5, v)?;
+        }
+        if let Some(v) = self.longValue {
+            os.write_int64(6, v)?;
+        }
+        if let Some(ref v) = self.stringValue.as_ref() {
+            os.write_string(7, &v)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &dyn (::std::any::Any) {
+        self as &dyn (::std::any::Any)
+    }
+    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
+        self as &mut dyn (::std::any::Any)
+    }
+    fn into_any(self: ::std::boxed::Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> KeyValue {
+        KeyValue::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::LazyV2<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::LazyV2::INIT;
+        descriptor.get(|| {
+            let mut fields = ::std::vec::Vec::new();
+            fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                "key",
+                |m: &KeyValue| { &m.key },
+                |m: &mut KeyValue| { &mut m.key },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
+                "blobValue",
+                |m: &KeyValue| { &m.blobValue },
+                |m: &mut KeyValue| { &mut m.blobValue },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                "booleanValue",
+                |m: &KeyValue| { &m.booleanValue },
+                |m: &mut KeyValue| { &mut m.booleanValue },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeFloat>(
+                "floatValue",
+                |m: &KeyValue| { &m.floatValue },
+                |m: &mut KeyValue| { &mut m.floatValue },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                "integerValue",
+                |m: &KeyValue| { &m.integerValue },
+                |m: &mut KeyValue| { &mut m.integerValue },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                "longValue",
+                |m: &KeyValue| { &m.longValue },
+                |m: &mut KeyValue| { &mut m.longValue },
+            ));
+            fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                "stringValue",
+                |m: &KeyValue| { &m.stringValue },
+                |m: &mut KeyValue| { &mut m.stringValue },
+            ));
+            ::protobuf::reflect::MessageDescriptor::new_pb_name::<KeyValue>(
+                "KeyValue",
+                fields,
+                file_descriptor_proto()
+            )
+        })
+    }
+
+    fn default_instance() -> &'static KeyValue {
+        static instance: ::protobuf::rt::LazyV2<KeyValue> = ::protobuf::rt::LazyV2::INIT;
+        instance.get(KeyValue::new)
+    }
+}
+
+impl ::protobuf::Clear for KeyValue {
+    fn clear(&mut self) {
+        self.key.clear();
+        self.blobValue.clear();
+        self.booleanValue = ::std::option::Option::None;
+        self.floatValue = ::std::option::Option::None;
+        self.integerValue = ::std::option::Option::None;
+        self.longValue = ::std::option::Option::None;
+        self.stringValue.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for KeyValue {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for KeyValue {
+    fn as_ref(&self) -> ::protobuf::reflect::ReflectValueRef {
+        ::protobuf::reflect::ReflectValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct BackupFrame {
     // message fields
     pub header: ::protobuf::SingularPtrField<Header>,
@@ -1929,6 +2477,7 @@ pub struct BackupFrame {
     end: ::std::option::Option<bool>,
     pub avatar: ::protobuf::SingularPtrField<Avatar>,
     pub sticker: ::protobuf::SingularPtrField<Sticker>,
+    pub keyValue: ::protobuf::SingularPtrField<KeyValue>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -2194,6 +2743,39 @@ impl BackupFrame {
     pub fn take_sticker(&mut self) -> Sticker {
         self.sticker.take().unwrap_or_else(|| Sticker::new())
     }
+
+    // optional .signal.KeyValue keyValue = 9;
+
+
+    pub fn get_keyValue(&self) -> &KeyValue {
+        self.keyValue.as_ref().unwrap_or_else(|| <KeyValue as ::protobuf::Message>::default_instance())
+    }
+    pub fn clear_keyValue(&mut self) {
+        self.keyValue.clear();
+    }
+
+    pub fn has_keyValue(&self) -> bool {
+        self.keyValue.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_keyValue(&mut self, v: KeyValue) {
+        self.keyValue = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_keyValue(&mut self) -> &mut KeyValue {
+        if self.keyValue.is_none() {
+            self.keyValue.set_default();
+        }
+        self.keyValue.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_keyValue(&mut self) -> KeyValue {
+        self.keyValue.take().unwrap_or_else(|| KeyValue::new())
+    }
 }
 
 impl ::protobuf::Message for BackupFrame {
@@ -2233,6 +2815,11 @@ impl ::protobuf::Message for BackupFrame {
                 return false;
             }
         };
+        for v in &self.keyValue {
+            if !v.is_initialized() {
+                return false;
+            }
+        };
         true
     }
 
@@ -2267,6 +2854,9 @@ impl ::protobuf::Message for BackupFrame {
                 },
                 8 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.sticker)?;
+                },
+                9 => {
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.keyValue)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -2311,6 +2901,10 @@ impl ::protobuf::Message for BackupFrame {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         }
+        if let Some(ref v) = self.keyValue.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -2352,6 +2946,11 @@ impl ::protobuf::Message for BackupFrame {
         }
         if let Some(ref v) = self.sticker.as_ref() {
             os.write_tag(8, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
+        }
+        if let Some(ref v) = self.keyValue.as_ref() {
+            os.write_tag(9, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         }
@@ -2433,6 +3032,11 @@ impl ::protobuf::Message for BackupFrame {
                 |m: &BackupFrame| { &m.sticker },
                 |m: &mut BackupFrame| { &mut m.sticker },
             ));
+            fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<KeyValue>>(
+                "keyValue",
+                |m: &BackupFrame| { &m.keyValue },
+                |m: &mut BackupFrame| { &mut m.keyValue },
+            ));
             ::protobuf::reflect::MessageDescriptor::new_pb_name::<BackupFrame>(
                 "BackupFrame",
                 fields,
@@ -2457,6 +3061,7 @@ impl ::protobuf::Clear for BackupFrame {
         self.end = ::std::option::Option::None;
         self.avatar.clear();
         self.sticker.clear();
+        self.keyValue.clear();
         self.unknown_fields.clear();
     }
 }
@@ -2481,28 +3086,37 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     aramter\x12*\n\x10integerParameter\x18\x02\x20\x01(\x04R\x10integerParam\
     eter\x12(\n\x0fdoubleParameter\x18\x03\x20\x01(\x01R\x0fdoubleParameter\
     \x12$\n\rblobParameter\x18\x04\x20\x01(\x0cR\rblobParameter\x12$\n\rnull\
-    parameter\x18\x05\x20\x01(\x08R\rnullparameter\"N\n\x10SharedPreference\
-    \x12\x12\n\x04file\x18\x01\x20\x01(\tR\x04file\x12\x10\n\x03key\x18\x02\
-    \x20\x01(\tR\x03key\x12\x14\n\x05value\x18\x03\x20\x01(\tR\x05value\"^\n\
-    \nAttachment\x12\x14\n\x05rowId\x18\x01\x20\x01(\x04R\x05rowId\x12\"\n\
-    \x0cattachmentId\x18\x02\x20\x01(\x04R\x0cattachmentId\x12\x16\n\x06leng\
-    th\x18\x03\x20\x01(\rR\x06length\"7\n\x07Sticker\x12\x14\n\x05rowId\x18\
-    \x01\x20\x01(\x04R\x05rowId\x12\x16\n\x06length\x18\x02\x20\x01(\rR\x06l\
-    ength\"V\n\x06Avatar\x12\x12\n\x04name\x18\x01\x20\x01(\tR\x04name\x12\
-    \x20\n\x0brecipientId\x18\x03\x20\x01(\tR\x0brecipientId\x12\x16\n\x06le\
-    ngth\x18\x02\x20\x01(\rR\x06length\"+\n\x0fDatabaseVersion\x12\x18\n\x07\
-    version\x18\x01\x20\x01(\rR\x07version\",\n\x06Header\x12\x0e\n\x02iv\
-    \x18\x01\x20\x01(\x0cR\x02iv\x12\x12\n\x04salt\x18\x02\x20\x01(\x0cR\x04\
-    salt\"\xef\x02\n\x0bBackupFrame\x12&\n\x06header\x18\x01\x20\x01(\x0b2\
-    \x0e.signal.HeaderR\x06header\x122\n\tstatement\x18\x02\x20\x01(\x0b2\
-    \x14.signal.SqlStatementR\tstatement\x128\n\npreference\x18\x03\x20\x01(\
-    \x0b2\x18.signal.SharedPreferenceR\npreference\x122\n\nattachment\x18\
-    \x04\x20\x01(\x0b2\x12.signal.AttachmentR\nattachment\x121\n\x07version\
-    \x18\x05\x20\x01(\x0b2\x17.signal.DatabaseVersionR\x07version\x12\x10\n\
-    \x03end\x18\x06\x20\x01(\x08R\x03end\x12&\n\x06avatar\x18\x07\x20\x01(\
-    \x0b2\x0e.signal.AvatarR\x06avatar\x12)\n\x07sticker\x18\x08\x20\x01(\
-    \x0b2\x0f.signal.StickerR\x07stickerB1\n!org.thoughtcrime.securesms.back\
-    upB\x0cBackupProtos\
+    parameter\x18\x05\x20\x01(\x08R\rnullparameter\"\xc6\x01\n\x10SharedPref\
+    erence\x12\x12\n\x04file\x18\x01\x20\x01(\tR\x04file\x12\x10\n\x03key\
+    \x18\x02\x20\x01(\tR\x03key\x12\x14\n\x05value\x18\x03\x20\x01(\tR\x05va\
+    lue\x12\"\n\x0cbooleanValue\x18\x04\x20\x01(\x08R\x0cbooleanValue\x12&\n\
+    \x0estringSetValue\x18\x05\x20\x03(\tR\x0estringSetValue\x12*\n\x10isStr\
+    ingSetValue\x18\x06\x20\x01(\x08R\x10isStringSetValue\"^\n\nAttachment\
+    \x12\x14\n\x05rowId\x18\x01\x20\x01(\x04R\x05rowId\x12\"\n\x0cattachment\
+    Id\x18\x02\x20\x01(\x04R\x0cattachmentId\x12\x16\n\x06length\x18\x03\x20\
+    \x01(\rR\x06length\"7\n\x07Sticker\x12\x14\n\x05rowId\x18\x01\x20\x01(\
+    \x04R\x05rowId\x12\x16\n\x06length\x18\x02\x20\x01(\rR\x06length\"V\n\
+    \x06Avatar\x12\x12\n\x04name\x18\x01\x20\x01(\tR\x04name\x12\x20\n\x0bre\
+    cipientId\x18\x03\x20\x01(\tR\x0brecipientId\x12\x16\n\x06length\x18\x02\
+    \x20\x01(\rR\x06length\"+\n\x0fDatabaseVersion\x12\x18\n\x07version\x18\
+    \x01\x20\x01(\rR\x07version\",\n\x06Header\x12\x0e\n\x02iv\x18\x01\x20\
+    \x01(\x0cR\x02iv\x12\x12\n\x04salt\x18\x02\x20\x01(\x0cR\x04salt\"\xe2\
+    \x01\n\x08KeyValue\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12\x1c\n\
+    \tblobValue\x18\x02\x20\x01(\x0cR\tblobValue\x12\"\n\x0cbooleanValue\x18\
+    \x03\x20\x01(\x08R\x0cbooleanValue\x12\x1e\n\nfloatValue\x18\x04\x20\x01\
+    (\x02R\nfloatValue\x12\"\n\x0cintegerValue\x18\x05\x20\x01(\x05R\x0cinte\
+    gerValue\x12\x1c\n\tlongValue\x18\x06\x20\x01(\x03R\tlongValue\x12\x20\n\
+    \x0bstringValue\x18\x07\x20\x01(\tR\x0bstringValue\"\x9d\x03\n\x0bBackup\
+    Frame\x12&\n\x06header\x18\x01\x20\x01(\x0b2\x0e.signal.HeaderR\x06heade\
+    r\x122\n\tstatement\x18\x02\x20\x01(\x0b2\x14.signal.SqlStatementR\tstat\
+    ement\x128\n\npreference\x18\x03\x20\x01(\x0b2\x18.signal.SharedPreferen\
+    ceR\npreference\x122\n\nattachment\x18\x04\x20\x01(\x0b2\x12.signal.Atta\
+    chmentR\nattachment\x121\n\x07version\x18\x05\x20\x01(\x0b2\x17.signal.D\
+    atabaseVersionR\x07version\x12\x10\n\x03end\x18\x06\x20\x01(\x08R\x03end\
+    \x12&\n\x06avatar\x18\x07\x20\x01(\x0b2\x0e.signal.AvatarR\x06avatar\x12\
+    )\n\x07sticker\x18\x08\x20\x01(\x0b2\x0f.signal.StickerR\x07sticker\x12,\
+    \n\x08keyValue\x18\t\x20\x01(\x0b2\x10.signal.KeyValueR\x08keyValueB1\n!\
+    org.thoughtcrime.securesms.backupB\x0cBackupProtos\
 ";
 
 static file_descriptor_proto_lazy: ::protobuf::rt::LazyV2<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::rt::LazyV2::INIT;
