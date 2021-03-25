@@ -219,13 +219,9 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 		Ok(())
 	}
 
-	fn write_avatar(&mut self, data: &[u8], name: &str) -> Result<(), anyhow::Error> {
-		//let mut path = self.path_sticker.join(format!("{}_{}", row_id, 1));
-		//if path.exists() {
-		//    path = self.path_sticker.join(format!("{}_{}", row_id, 2));
-		//}
-
-		self.write_to_file("avatar", &format!("{}_{}", name, self.count_avatar), &data)?;
+	fn write_avatar(&mut self, data: &[u8], _name: &str) -> Result<(), anyhow::Error> {
+		// avatar has never a name
+		self.write_to_file("avatar", &format!("{}", self.count_avatar), &data)?;
 
 		self.count_avatar += 1;
 		self.written_frames += 1;
