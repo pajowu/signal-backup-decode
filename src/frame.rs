@@ -52,22 +52,17 @@ pub enum KeyValueContent {
 
 impl Frame {
 	pub fn new(frame: &mut crate::Backups::BackupFrame) -> Result<Self, anyhow::Error> {
-		let mut fields_count = 0;
-		let mut ret: Self = Self::End;
-
 		if frame.has_header() {
-			fields_count += 1;
 			let mut header = frame.take_header();
-			ret = Self::Header {
+
+			// return header
+			Ok(Self::Header {
 				salt: header.take_salt(),
 				iv: header.take_iv(),
-			};
-		};
-
-		if frame.has_statement() {
-			fields_count += 1;
+			})
+		} else if frame.has_statement() {
 			let mut statement = frame.take_statement();
-			ret = Self::Statement {
+			let ret = Self::Statement {
 				statement: statement.take_statement(),
 				parameter: {
 					let mut params: Vec<rusqlite::types::Value> = Vec::new();
@@ -89,60 +84,50 @@ impl Frame {
 					params
 				},
 			};
-		};
 
-		if frame.has_preference() {
-			fields_count += 1;
-			ret = Self::Preference {
+			// return statement
+			Ok(ret)
+		} else if frame.has_preference() {
+			// return preference
+			Ok(Self::Preference {
 				preference: frame.take_preference(),
-			};
-		};
-
-		if frame.has_attachment() {
-			fields_count += 1;
+			})
+		} else if frame.has_attachment() {
 			let attachment = frame.take_attachment();
-			ret = Self::Attachment {
+
+			// return attachment
+			Ok(Self::Attachment {
 				data_length: attachment.get_length().try_into().unwrap(),
 				id: attachment.get_attachmentId(),
 				row: attachment.get_rowId(),
 				data: None,
-			};
-		};
-
-		if frame.has_version() {
-			fields_count += 1;
-			ret = Self::Version {
+			})
+		} else if frame.has_version() {
+			// return version
+			Ok(Self::Version {
 				version: frame.get_version().get_version(),
-			};
-		};
-
-		if frame.has_end() {
-			fields_count += 1;
-			// changing is not necessary here. ret is already set to Self::End
-		};
-
-		if frame.has_avatar() {
-			fields_count += 1;
+			})
+		} else if frame.has_end() {
+			Ok(Self::End)
+		} else if frame.has_avatar() {
 			let mut avatar = frame.take_avatar();
-			ret = Self::Avatar {
+
+			// return avatar
+			Ok(Self::Avatar {
 				data_length: avatar.get_length().try_into().unwrap(),
 				name: avatar.take_name(),
 				data: None,
-			};
-		};
-
-		if frame.has_sticker() {
-			fields_count += 1;
+			})
+		} else if frame.has_sticker() {
 			let sticker = frame.take_sticker();
-			ret = Self::Sticker {
+
+			// return sticker
+			Ok(Self::Sticker {
 				data_length: sticker.get_length().try_into().unwrap(),
 				row: sticker.get_rowId(),
 				data: None,
-			};
-		};
-
-		if frame.has_keyValue() {
-			fields_count += 1;
+			})
+		} else if frame.has_keyValue() {
 			let mut keyvalue = frame.take_keyValue();
 			let value = if keyvalue.has_blobValue() {
 				KeyValueContent::Blob(keyvalue.take_blobValue())
@@ -160,19 +145,16 @@ impl Frame {
 				unreachable!()
 			};
 
-			ret = Self::KeyValue {
+			// return keyvalue
+			Ok(Self::KeyValue {
 				key: keyvalue.take_key(),
 				value,
-			};
-		};
-
-		if fields_count != 1 {
+			})
+		} else {
 			Err(anyhow!(
-				"Frame with an unsupported number of fields found, please report to author: {:?}",
+				"Frame with an unsupported field found, please report to author: {:?}",
 				frame
 			))
-		} else {
-			Ok(ret)
 		}
 	}
 
