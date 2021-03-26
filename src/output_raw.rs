@@ -12,7 +12,6 @@ pub struct SignalOutputRaw {
 	buffer_keyvalue: std::io::BufWriter<std::fs::File>,
 	force_write: bool,
 	sqlite_connection: rusqlite::Connection,
-	sqlite_in_memory: bool,
 	count_attachment: usize,
 	count_sticker: usize,
 	count_avatar: usize,
@@ -107,7 +106,6 @@ impl SignalOutputRaw {
 			buffer_keyvalue,
 			force_write,
 			sqlite_connection,
-			sqlite_in_memory: open_db_in_memory,
 			count_attachment: 0,
 			count_sticker: 0,
 			count_avatar: 0,
@@ -288,11 +286,13 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 	}
 
 	fn finish(&mut self) -> Result<(), anyhow::Error> {
-		if !self.sqlite_in_memory {
+		let path_sqlite = self.path_output.join("signal_backup.db");
+
+		// if path already exists we have directly written to database and don't need to flush the
+		// db to a file.
+		if path_sqlite.exists() {
 			return Ok(());
 		}
-
-		let path_sqlite = self.path_output.join("signal_backup.db");
 
 		self.sqlite_connection
 			.execute(
