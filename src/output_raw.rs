@@ -61,6 +61,18 @@ impl SignalOutputRaw {
 			}
 		}
 
+		if open_db_in_memory && rusqlite::version_number() < 3027000 {
+			/* VACUUM INTO 'somefile.db' requires SQLite >= 3.27 */
+			return Err(anyhow!(
+				concat!(
+					"SQLite version {} was detected, but we need at ",
+					"least version 3.27.0 to use in-memory databases. ",
+					"Try again with --no-in-memory-db"
+				),
+				rusqlite::version()
+			));
+		}
+
 		let sqlite_connection = if open_db_in_memory {
 			rusqlite::Connection::open_in_memory()
 				.with_context(|| "could not open connection to in memory database".to_string())?
