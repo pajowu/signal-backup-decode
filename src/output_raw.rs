@@ -73,6 +73,8 @@ impl SignalOutputRaw {
 			})?
 		};
 
+		sqlite_connection.execute("BEGIN TRANSACTION;", rusqlite::NO_PARAMS)?;
+
 		Ok(Self {
 			path_output: path.to_path_buf(),
 			force_write,
@@ -254,6 +256,8 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 	}
 
 	fn finish(&mut self) -> Result<(), anyhow::Error> {
+		self.sqlite_connection.execute("COMMIT;", rusqlite::NO_PARAMS)?;
+
 		if !self.sqlite_in_memory {
 			return Ok(());
 		}
