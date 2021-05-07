@@ -51,18 +51,38 @@ pub enum KeyValueContent {
 }
 
 impl Frame {
+	/// Creates a new frame from protobuf
 	pub fn new(frame: &mut crate::Backups::BackupFrame) -> Result<Self, anyhow::Error> {
+		// The field count and return value are necessary to check against unknown protobuf field
+		// types. Unknown field types might not be detected, thus `field_count` stays at zero.
+		// Sometimes they result in reading two different known field types, thus `field_count`
+		// gets increased to two.
+		//
+		// See: https://github.com/pajowu/signal-backup-decode/pull/43 for a discussion on this.
+		let mut field_count = 0;
+		let mut ret = Self::End;
+
 		if frame.has_header() {
+			// increase field count
+			field_count += 1;
+
+			// get header
 			let mut header = frame.take_header();
 
 			// return header
-			Ok(Self::Header {
+			ret = Self::Header {
 				salt: header.take_salt(),
 				iv: header.take_iv(),
-			})
-		} else if frame.has_statement() {
+			};
+		}
+
+		if frame.has_statement() {
+			// increase field count
+			field_count += 1;
+
+			// build statement
 			let mut statement = frame.take_statement();
-			let ret = Self::Statement {
+			ret = Self::Statement {
 				statement: statement.take_statement(),
 				parameter: {
 					let mut params: Vec<rusqlite::types::Value> = Vec::new();
@@ -84,50 +104,86 @@ impl Frame {
 					params
 				},
 			};
+		}
 
-			// return statement
-			Ok(ret)
-		} else if frame.has_preference() {
+		if frame.has_preference() {
+			// increase field count
+			field_count += 1;
+
 			// return preference
-			Ok(Self::Preference {
+			ret = Self::Preference {
 				preference: frame.take_preference(),
-			})
-		} else if frame.has_attachment() {
+			};
+		}
+
+		if frame.has_attachment() {
+			// increase field count
+			field_count += 1;
+
+			// get attachment
 			let attachment = frame.take_attachment();
 
 			// return attachment
-			Ok(Self::Attachment {
+			ret = Self::Attachment {
 				data_length: attachment.get_length().try_into().unwrap(),
 				id: attachment.get_attachmentId(),
 				row: attachment.get_rowId(),
 				data: None,
-			})
-		} else if frame.has_version() {
+			};
+		}
+
+		if frame.has_version() {
+			// increase field count
+			field_count += 1;
+
 			// return version
-			Ok(Self::Version {
+			ret = Self::Version {
 				version: frame.get_version().get_version(),
-			})
-		} else if frame.has_end() {
-			Ok(Self::End)
-		} else if frame.has_avatar() {
+			}
+		}
+
+		if frame.has_end() {
+			// increase field count
+			field_count += 1;
+
+			ret = Self::End;
+		}
+
+		if frame.has_avatar() {
+			// increase field count
+			field_count += 1;
+
+			// take avatar
 			let mut avatar = frame.take_avatar();
 
 			// return avatar
-			Ok(Self::Avatar {
+			ret = Self::Avatar {
 				data_length: avatar.get_length().try_into().unwrap(),
 				name: avatar.take_name(),
 				data: None,
-			})
-		} else if frame.has_sticker() {
+			};
+		}
+
+		if frame.has_sticker() {
+			// increase field count
+			field_count += 1;
+
+			// take sticker
 			let sticker = frame.take_sticker();
 
 			// return sticker
-			Ok(Self::Sticker {
+			ret = Self::Sticker {
 				data_length: sticker.get_length().try_into().unwrap(),
 				row: sticker.get_rowId(),
 				data: None,
-			})
-		} else if frame.has_keyValue() {
+			};
+		}
+
+		if frame.has_keyValue() {
+			// increase field count
+			field_count += 1;
+
+			// get keyvalue
 			let mut keyvalue = frame.take_keyValue();
 			let value = if keyvalue.has_blobValue() {
 				KeyValueContent::Blob(keyvalue.take_blobValue())
@@ -146,15 +202,19 @@ impl Frame {
 			};
 
 			// return keyvalue
-			Ok(Self::KeyValue {
+			ret = Self::KeyValue {
 				key: keyvalue.take_key(),
 				value,
-			})
-		} else {
+			};
+		}
+
+		if field_count != 1 {
 			Err(anyhow!(
 				"Frame with an unsupported field found, please report to author: {:?}",
 				frame
 			))
+		} else {
+			Ok(ret)
 		}
 	}
 
