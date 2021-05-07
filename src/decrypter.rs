@@ -1,6 +1,5 @@
 use hmac::crypto_mac::Mac;
 use hmac::crypto_mac::NewMac;
-use openssl;
 use sha2::Digest;
 use subtle::ConstantTimeEq;
 

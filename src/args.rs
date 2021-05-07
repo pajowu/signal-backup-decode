@@ -160,7 +160,7 @@ impl Config {
 				unreachable!()
 			}
 		};
-		password.retain(|c| c >= '0' && c <= '9');
+		password.retain(|c| ('0'..='9').contains(&c));
 		let password = password.as_bytes().to_vec();
 		if password.len() != 30 {
 			return Err(anyhow!(
