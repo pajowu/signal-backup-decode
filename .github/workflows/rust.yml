@@ -25,7 +25,7 @@ jobs:
     - name: Check if rust code is correctly formatted
       run: cargo fmt -- --check
     - name: Check against clippy lints
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo clippy -- -D warnings
 
   build_and_test_1_41:
     runs-on: ubuntu-latest
