@@ -19,9 +19,9 @@ jobs:
           toolchain: stable
 
     - name: Build against current compiler        
-      run: cargo build --verbose
+      run: cargo build
     - name: Run tests against current compiler
-      run: cargo test --verbose --all-features --no-fail-fast
+      run: cargo test --no-fail-fast
     - name: Check if rust code is correctly formatted
       run: cargo fmt -- --check
     - name: Check against clippy lints
