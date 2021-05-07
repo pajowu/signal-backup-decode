@@ -98,7 +98,11 @@ impl crate::output::SignalOutput for SignalOutputCsv {
 		Ok(())
 	}
 
-	fn write_key_value(&mut self, key_value: &crate::Backups::KeyValue) ->  Result<(), anyhow::Error>{
+	fn write_keyvalue(
+		&mut self,
+		_key: &str,
+		_value: &crate::frame::KeyValueContent,
+	) -> Result<(), anyhow::Error> {
 		self.written_frames += 1;
 		Ok(())
 	}

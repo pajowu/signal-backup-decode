@@ -19,9 +19,14 @@ jobs:
           toolchain: stable
 
     - name: Build against current compiler        
-      run: cargo build --verbose
+      run: cargo build
     - name: Run tests against current compiler
-      run: cargo test --verbose
+      run: cargo test --no-fail-fast
+    - name: Check if rust code is correctly formatted
+      run: cargo fmt -- --check
+    - name: Check against clippy lints
+      run: cargo clippy -- -D warnings
+
   build_and_test_1_41:
     runs-on: ubuntu-latest
     steps:

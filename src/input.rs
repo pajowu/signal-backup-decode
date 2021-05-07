@@ -75,7 +75,7 @@ impl InputFile {
 
 		// read data and decrypt
 		self.reader.read_exact(&mut data)?;
-		let data = self.decrypter.decrypt(&mut data);
+		let data = self.decrypter.decrypt(&data);
 
 		// read hmac
 		self.reader.read_exact(&mut hmac)?;

@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use anyhow::Context;
 use std::convert::TryInto;
 
@@ -35,35 +36,53 @@ pub enum Frame {
 		data: Option<Vec<u8>>,
 	},
 	KeyValue {
-		key_value: crate::Backups::KeyValue
-		    // optional string key          = 1;
-    // optional bytes  blobValue    = 2;
-    // optional bool   booleanValue = 3;
-    // optional float  floatValue   = 4;
-    // optional int32  integerValue = 5;
-    // optional int64  longValue    = 6;
-    // optional string stringValue  = 7;
-	}
+		key: String,
+		value: KeyValueContent,
+	},
+}
+
+#[derive(Debug)]
+pub enum KeyValueContent {
+	Blob(Vec<u8>),
+	Bool(bool),
+	Float(f32),
+	Int(i64),
+	String(String),
 }
 
 impl Frame {
-	pub fn new(frame: &mut crate::Backups::BackupFrame) -> Self {
-		let mut fields_count = 0;
-		let mut ret: Option<Self> = None;
+	/// Creates a new frame from protobuf
+	pub fn new(frame: &mut crate::Backups::BackupFrame) -> Result<Self, anyhow::Error> {
+		// The field count and return value are necessary to check against unknown protobuf field
+		// types. Unknown field types might not be detected, thus `field_count` stays at zero.
+		// Sometimes they result in reading two different known field types, thus `field_count`
+		// gets increased to two.
+		//
+		// See: https://github.com/pajowu/signal-backup-decode/pull/43 for a discussion on this.
+		let mut field_count = 0;
+		let mut ret = Self::End;
 
 		if frame.has_header() {
-			fields_count += 1;
+			// increase field count
+			field_count += 1;
+
+			// get header
 			let mut header = frame.take_header();
-			ret = Some(Self::Header {
+
+			// return header
+			ret = Self::Header {
 				salt: header.take_salt(),
 				iv: header.take_iv(),
-			});
-		};
+			};
+		}
 
 		if frame.has_statement() {
-			fields_count += 1;
+			// increase field count
+			field_count += 1;
+
+			// build statement
 			let mut statement = frame.take_statement();
-			ret = Some(Self::Statement {
+			ret = Self::Statement {
 				statement: statement.take_statement(),
 				parameter: {
 					let mut params: Vec<rusqlite::types::Value> = Vec::new();
@@ -84,75 +103,119 @@ impl Frame {
 					}
 					params
 				},
-			});
-		};
+			};
+		}
 
 		if frame.has_preference() {
-			fields_count += 1;
-			ret = Some(Self::Preference {
+			// increase field count
+			field_count += 1;
+
+			// return preference
+			ret = Self::Preference {
 				preference: frame.take_preference(),
-			});
-		};
+			};
+		}
 
 		if frame.has_attachment() {
-			fields_count += 1;
+			// increase field count
+			field_count += 1;
+
+			// get attachment
 			let attachment = frame.take_attachment();
-			ret = Some(Self::Attachment {
+
+			// return attachment
+			ret = Self::Attachment {
 				data_length: attachment.get_length().try_into().unwrap(),
 				id: attachment.get_attachmentId(),
 				row: attachment.get_rowId(),
 				data: None,
-			});
-		};
+			};
+		}
 
 		if frame.has_version() {
-			fields_count += 1;
-			ret = Some(Self::Version {
+			// increase field count
+			field_count += 1;
+
+			// return version
+			ret = Self::Version {
 				version: frame.get_version().get_version(),
-			});
-		};
+			}
+		}
 
 		if frame.has_end() {
-			fields_count += 1;
-			ret = Some(Self::End);
-		};
+			// increase field count
+			field_count += 1;
+
+			ret = Self::End;
+		}
 
 		if frame.has_avatar() {
-			fields_count += 1;
+			// increase field count
+			field_count += 1;
+
+			// take avatar
 			let mut avatar = frame.take_avatar();
-			ret = Some(Self::Avatar {
+
+			// return avatar
+			ret = Self::Avatar {
 				data_length: avatar.get_length().try_into().unwrap(),
 				name: avatar.take_name(),
 				data: None,
-			});
-		};
+			};
+		}
 
 		if frame.has_sticker() {
-			fields_count += 1;
+			// increase field count
+			field_count += 1;
+
+			// take sticker
 			let sticker = frame.take_sticker();
-			ret = Some(Self::Sticker {
+
+			// return sticker
+			ret = Self::Sticker {
 				data_length: sticker.get_length().try_into().unwrap(),
 				row: sticker.get_rowId(),
 				data: None,
-			});
-		};
+			};
+		}
 
 		if frame.has_keyValue() {
-			fields_count += 1;
-			let key_value = frame.take_keyValue();
-			ret = Some(Self::KeyValue {
-				key_value
-			});
-		};
+			// increase field count
+			field_count += 1;
 
-		if fields_count != 1 {
-			panic!(
-				"Frame with an unsupported number of fields found, please report to author: {:?}",
+			// get keyvalue
+			let mut keyvalue = frame.take_keyValue();
+			let value = if keyvalue.has_blobValue() {
+				KeyValueContent::Blob(keyvalue.take_blobValue())
+			} else if keyvalue.has_booleanValue() {
+				KeyValueContent::Bool(keyvalue.get_booleanValue())
+			} else if keyvalue.has_floatValue() {
+				KeyValueContent::Float(keyvalue.get_floatValue())
+			} else if keyvalue.has_integerValue() {
+				KeyValueContent::Int(keyvalue.get_integerValue().into())
+			} else if keyvalue.has_longValue() {
+				KeyValueContent::Int(keyvalue.get_longValue())
+			} else if keyvalue.has_stringValue() {
+				KeyValueContent::String(keyvalue.take_stringValue())
+			} else {
+				unreachable!()
+			};
+
+			// return keyvalue
+			ret = Self::KeyValue {
+				key: keyvalue.take_key(),
+				value,
+			};
+		}
+
+		if field_count != 1 {
+			Err(anyhow!(
+				"Frame with an unsupported field found, please report to author: {:?}",
 				frame
-			);
-		};
-
-		ret.unwrap()
+			))
+		} else {
+			Ok(ret)
+		}
 	}
 
 	pub fn set_data(&mut self, data_add: Vec<u8>) {
@@ -183,7 +246,7 @@ impl std::fmt::Display for Frame {
 			Self::Statement { .. } => write!(f, "Statement"),
 			Self::Version { version } => write!(f, "Version ({})", version),
 			Self::End => write!(f, "End"),
-			Self::KeyValue { .. } => write!(f, "KeyValue"),
+			Self::KeyValue { key, value } => write!(f, "KeyValue: {} = {:?}", key, value),
 		}
 	}
 }
@@ -194,6 +257,6 @@ impl std::convert::TryFrom<Vec<u8>> for Frame {
 	fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
 		let mut frame = protobuf::Message::parse_from_bytes(&data)
 			.with_context(|| format!("Could not parse frame from {:02X?}", &data))?;
-		Ok(Self::new(&mut frame))
+		Self::new(&mut frame)
 	}
 }

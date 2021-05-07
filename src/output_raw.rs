@@ -9,14 +9,14 @@ use std::io::Write;
 /// directories.
 pub struct SignalOutputRaw {
 	path_output: std::path::PathBuf,
+	buffer_keyvalue: std::io::BufWriter<std::fs::File>,
 	force_write: bool,
 	sqlite_connection: rusqlite::Connection,
-	sqlite_in_memory: bool,
 	count_attachment: usize,
 	count_sticker: usize,
 	count_avatar: usize,
 	written_frames: usize,
-	created_files: std::boxed::Box<std::collections::HashSet<std::path::PathBuf>>
+	created_files: std::boxed::Box<std::collections::HashSet<std::path::PathBuf>>,
 }
 
 impl SignalOutputRaw {
@@ -73,17 +73,45 @@ impl SignalOutputRaw {
 			})?
 		};
 
+		// open keyvalue textfile
+		let path_keyvalue = path.join("keyvalue");
+
+		if path_keyvalue.exists() {
+			if force_write {
+				std::fs::remove_file(&path_keyvalue).with_context(|| {
+					format!(
+						"Could not delete old keyvalue file: {}",
+						path_keyvalue.to_string_lossy()
+					)
+				})?;
+			} else {
+				return Err(anyhow!(
+					"Backup keyvalue file already exists: {}. Try -f",
+					path_keyvalue.to_string_lossy()
+				));
+			}
+		}
+
+		let fd_keyvalue = std::fs::File::create(&path_keyvalue).with_context(|| {
+			format!(
+				"Could not create keyvalue file: {}",
+				path_keyvalue.to_string_lossy()
+			)
+		})?;
+		let buffer_keyvalue = std::io::BufWriter::new(fd_keyvalue);
+
+		// return self
 		Ok(Self {
 			path_output: path.to_path_buf(),
+			buffer_keyvalue,
 			force_write,
 			sqlite_connection,
-			sqlite_in_memory: open_db_in_memory,
 			count_attachment: 0,
 			count_sticker: 0,
 			count_avatar: 0,
 			// we set read frames to 1 due to the header frame we will never write
 			written_frames: 1,
-			created_files: std::boxed::Box::new(std::collections::HashSet::new())
+			created_files: std::boxed::Box::new(std::collections::HashSet::new()),
 		})
 	}
 
@@ -156,12 +184,12 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 	fn write_attachment(
 		&mut self,
 		data: &[u8],
-		attachmend_id: u64,
+		attachment_id: u64,
 		row_id: u64,
 	) -> Result<(), anyhow::Error> {
 		self.write_to_file(
 			"attachment",
-			&format!("{}_{}", attachmend_id, row_id),
+			&format!("{}_{}", attachment_id, row_id),
 			&data,
 		)?;
 
@@ -189,13 +217,9 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 		Ok(())
 	}
 
-	fn write_avatar(&mut self, data: &[u8], name: &str) -> Result<(), anyhow::Error> {
-		//let mut path = self.path_sticker.join(format!("{}_{}", row_id, 1));
-		//if path.exists() {
-		//    path = self.path_sticker.join(format!("{}_{}", row_id, 2));
-		//}
-
-		self.write_to_file("avatar", &format!("{}_{}", name, self.count_avatar), &data)?;
+	fn write_avatar(&mut self, data: &[u8], _name: &str) -> Result<(), anyhow::Error> {
+		// avatar has never a name
+		self.write_to_file("avatar", &format!("{}", self.count_avatar), &data)?;
 
 		self.count_avatar += 1;
 		self.written_frames += 1;
@@ -244,7 +268,15 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 		Ok(())
 	}
 
-	fn write_key_value(&mut self, key_value: &crate::Backups::KeyValue) ->  Result<(), anyhow::Error>{
+	fn write_keyvalue(
+		&mut self,
+		key: &str,
+		value: &crate::frame::KeyValueContent,
+	) -> Result<(), anyhow::Error> {
+		self.buffer_keyvalue
+			.write(format!("{} = {:?}\n", key, value).as_bytes())
+			.context("Could not write to keyvalue file")?;
+
 		self.written_frames += 1;
 		Ok(())
 	}
@@ -254,11 +286,13 @@ impl crate::output::SignalOutput for SignalOutputRaw {
 	}
 
 	fn finish(&mut self) -> Result<(), anyhow::Error> {
-		if !self.sqlite_in_memory {
+		let path_sqlite = self.path_output.join("signal_backup.db");
+
+		// if path already exists we have directly written to database and don't need to flush the
+		// db to a file.
+		if path_sqlite.exists() {
 			return Ok(());
 		}
-
-		let path_sqlite = self.path_output.join("signal_backup.db");
 
 		self.sqlite_connection
 			.execute(
