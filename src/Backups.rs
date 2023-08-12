@@ -6,7 +6,6 @@
 #![allow(clippy::all)]
 
 #![allow(unused_attributes)]
-#![rustfmt::skip]
 
 #![allow(box_pointers)]
 #![allow(dead_code)]
@@ -1821,6 +1820,7 @@ pub struct Header {
     // message fields
     iv: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     salt: ::protobuf::SingularField<::std::vec::Vec<u8>>,
+    version: ::std::option::Option<u32>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -1908,6 +1908,25 @@ impl Header {
     pub fn take_salt(&mut self) -> ::std::vec::Vec<u8> {
         self.salt.take().unwrap_or_else(|| ::std::vec::Vec::new())
     }
+
+    // optional uint32 version = 3;
+
+
+    pub fn get_version(&self) -> u32 {
+        self.version.unwrap_or(0)
+    }
+    pub fn clear_version(&mut self) {
+        self.version = ::std::option::Option::None;
+    }
+
+    pub fn has_version(&self) -> bool {
+        self.version.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_version(&mut self, v: u32) {
+        self.version = ::std::option::Option::Some(v);
+    }
 }
 
 impl ::protobuf::Message for Header {
@@ -1924,6 +1943,13 @@ impl ::protobuf::Message for Header {
                 },
                 2 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.salt)?;
+                },
+                3 => {
+                    if wire_type != ::protobuf::wire_format::WireTypeVarint {
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                    }
+                    let tmp = is.read_uint32()?;
+                    self.version = ::std::option::Option::Some(tmp);
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -1943,6 +1969,9 @@ impl ::protobuf::Message for Header {
         if let Some(ref v) = self.salt.as_ref() {
             my_size += ::protobuf::rt::bytes_size(2, &v);
         }
+        if let Some(v) = self.version {
+            my_size += ::protobuf::rt::value_size(3, v, ::protobuf::wire_format::WireTypeVarint);
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -1954,6 +1983,9 @@ impl ::protobuf::Message for Header {
         }
         if let Some(ref v) = self.salt.as_ref() {
             os.write_bytes(2, &v)?;
+        }
+        if let Some(v) = self.version {
+            os.write_uint32(3, v)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -2003,6 +2035,11 @@ impl ::protobuf::Message for Header {
                 |m: &Header| { &m.salt },
                 |m: &mut Header| { &mut m.salt },
             ));
+            fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                "version",
+                |m: &Header| { &m.version },
+                |m: &mut Header| { &mut m.version },
+            ));
             ::protobuf::reflect::MessageDescriptor::new_pb_name::<Header>(
                 "Header",
                 fields,
@@ -2021,6 +2058,7 @@ impl ::protobuf::Clear for Header {
     fn clear(&mut self) {
         self.iv.clear();
         self.salt.clear();
+        self.version = ::std::option::Option::None;
         self.unknown_fields.clear();
     }
 }
@@ -3099,24 +3137,25 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x06Avatar\x12\x12\n\x04name\x18\x01\x20\x01(\tR\x04name\x12\x20\n\x0bre\
     cipientId\x18\x03\x20\x01(\tR\x0brecipientId\x12\x16\n\x06length\x18\x02\
     \x20\x01(\rR\x06length\"+\n\x0fDatabaseVersion\x12\x18\n\x07version\x18\
-    \x01\x20\x01(\rR\x07version\",\n\x06Header\x12\x0e\n\x02iv\x18\x01\x20\
-    \x01(\x0cR\x02iv\x12\x12\n\x04salt\x18\x02\x20\x01(\x0cR\x04salt\"\xe2\
-    \x01\n\x08KeyValue\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12\x1c\n\
-    \tblobValue\x18\x02\x20\x01(\x0cR\tblobValue\x12\"\n\x0cbooleanValue\x18\
-    \x03\x20\x01(\x08R\x0cbooleanValue\x12\x1e\n\nfloatValue\x18\x04\x20\x01\
-    (\x02R\nfloatValue\x12\"\n\x0cintegerValue\x18\x05\x20\x01(\x05R\x0cinte\
-    gerValue\x12\x1c\n\tlongValue\x18\x06\x20\x01(\x03R\tlongValue\x12\x20\n\
-    \x0bstringValue\x18\x07\x20\x01(\tR\x0bstringValue\"\x9d\x03\n\x0bBackup\
-    Frame\x12&\n\x06header\x18\x01\x20\x01(\x0b2\x0e.signal.HeaderR\x06heade\
-    r\x122\n\tstatement\x18\x02\x20\x01(\x0b2\x14.signal.SqlStatementR\tstat\
-    ement\x128\n\npreference\x18\x03\x20\x01(\x0b2\x18.signal.SharedPreferen\
-    ceR\npreference\x122\n\nattachment\x18\x04\x20\x01(\x0b2\x12.signal.Atta\
-    chmentR\nattachment\x121\n\x07version\x18\x05\x20\x01(\x0b2\x17.signal.D\
-    atabaseVersionR\x07version\x12\x10\n\x03end\x18\x06\x20\x01(\x08R\x03end\
-    \x12&\n\x06avatar\x18\x07\x20\x01(\x0b2\x0e.signal.AvatarR\x06avatar\x12\
-    )\n\x07sticker\x18\x08\x20\x01(\x0b2\x0f.signal.StickerR\x07sticker\x12,\
-    \n\x08keyValue\x18\t\x20\x01(\x0b2\x10.signal.KeyValueR\x08keyValueB1\n!\
-    org.thoughtcrime.securesms.backupB\x0cBackupProtos\
+    \x01\x20\x01(\rR\x07version\"F\n\x06Header\x12\x0e\n\x02iv\x18\x01\x20\
+    \x01(\x0cR\x02iv\x12\x12\n\x04salt\x18\x02\x20\x01(\x0cR\x04salt\x12\x18\
+    \n\x07version\x18\x03\x20\x01(\rR\x07version\"\xe2\x01\n\x08KeyValue\x12\
+    \x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12\x1c\n\tblobValue\x18\x02\
+    \x20\x01(\x0cR\tblobValue\x12\"\n\x0cbooleanValue\x18\x03\x20\x01(\x08R\
+    \x0cbooleanValue\x12\x1e\n\nfloatValue\x18\x04\x20\x01(\x02R\nfloatValue\
+    \x12\"\n\x0cintegerValue\x18\x05\x20\x01(\x05R\x0cintegerValue\x12\x1c\n\
+    \tlongValue\x18\x06\x20\x01(\x03R\tlongValue\x12\x20\n\x0bstringValue\
+    \x18\x07\x20\x01(\tR\x0bstringValue\"\x9d\x03\n\x0bBackupFrame\x12&\n\
+    \x06header\x18\x01\x20\x01(\x0b2\x0e.signal.HeaderR\x06header\x122\n\tst\
+    atement\x18\x02\x20\x01(\x0b2\x14.signal.SqlStatementR\tstatement\x128\n\
+    \npreference\x18\x03\x20\x01(\x0b2\x18.signal.SharedPreferenceR\nprefere\
+    nce\x122\n\nattachment\x18\x04\x20\x01(\x0b2\x12.signal.AttachmentR\natt\
+    achment\x121\n\x07version\x18\x05\x20\x01(\x0b2\x17.signal.DatabaseVersi\
+    onR\x07version\x12\x10\n\x03end\x18\x06\x20\x01(\x08R\x03end\x12&\n\x06a\
+    vatar\x18\x07\x20\x01(\x0b2\x0e.signal.AvatarR\x06avatar\x12)\n\x07stick\
+    er\x18\x08\x20\x01(\x0b2\x0f.signal.StickerR\x07sticker\x12,\n\x08keyVal\
+    ue\x18\t\x20\x01(\x0b2\x10.signal.KeyValueR\x08keyValueB1\n!org.thoughtc\
+    rime.securesms.backupB\x0cBackupProtos\
 ";
 
 static file_descriptor_proto_lazy: ::protobuf::rt::LazyV2<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::rt::LazyV2::INIT;
