@@ -1,6 +1,6 @@
 # signal backup decoder
 
-This repository contains a small programm to decode a backup produced by [Signal Android](https://github.com/signalapp/Signal-Android).
+This repository contains a small program to decode a backup produced by [Signal Android](https://github.com/signalapp/Signal-Android).
 
 
 ## Installation
