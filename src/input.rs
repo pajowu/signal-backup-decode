@@ -13,6 +13,7 @@ pub struct InputFile {
 	count_frame: usize,
 	count_byte: usize,
 	file_bytes: u64,
+	file_version: u32,
 }
 
 impl InputFile {
@@ -42,7 +43,7 @@ impl InputFile {
 
 		// check that frame is a header and return
 		match &frame {
-			crate::frame::Frame::Header { salt, iv } => Ok(Self {
+			crate::frame::Frame::Header { salt, iv, version } => Ok(Self {
 				reader,
 				decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
 				count_frame: 1,
@@ -51,35 +52,56 @@ impl InputFile {
 				// file. However, I don't know why.
 				count_byte: len + std::mem::size_of::<u32>() + 16,
 				file_bytes,
+				file_version: *version,
 			}),
 			_ => Err(anyhow!("first frame is not a header")),
 		}
 	}
 
 	fn read_decrypt_frame(&mut self) -> Result<Vec<u8>, anyhow::Error> {
-		// first read frame length
-		let mut encrypted_len = vec![0u8; 4];
-		self.reader.read_exact(&mut encrypted_len)?;
-
-		// hmac will be updated with the encrypted_len data later
-		let decrypted_len = self.decrypter.decrypt(&encrypted_len, false);
-
-		let length: usize = byteorder::BigEndian::read_u32(&decrypted_len)
-			.try_into()
-			.unwrap();
-
 		let mut hmac = [0u8; crate::decrypter::LENGTH_HMAC];
-		let mut data = vec![0u8; 4 + length - crate::decrypter::LENGTH_HMAC];
+		let length: usize;
+		let mut data;
 
-		// read data and decrypt
-		self.reader.read_exact(&mut data[4..])?;
-		data[0] = encrypted_len[0];
-		data[1] = encrypted_len[1];
-		data[2] = encrypted_len[2];
-		data[3] = encrypted_len[3];
+		if self.file_version == 0 {
+			// frame length is unencrypted, so read it directly:
+			length = self
+				.reader
+				.read_u32::<byteorder::BigEndian>()
+				.unwrap()
+				.try_into()
+				.unwrap();
 
-		let mut data = self.decrypter.decrypt(&mut data, true);
-		data = data[4..].to_vec();
+			data = vec![0u8; length - crate::decrypter::LENGTH_HMAC];
+
+			// read data and decrypt
+			self.reader.read_exact(&mut data)?;
+			data = self.decrypter.decrypt(&mut data, true);
+		} else {
+			// first read frame length
+			let mut encrypted_len = vec![0u8; 4];
+			self.reader.read_exact(&mut encrypted_len)?;
+
+			// hmac will be updated with the encrypted_len data later
+			let decrypted_len = self.decrypter.decrypt(&encrypted_len, false);
+
+			length = byteorder::BigEndian::read_u32(&decrypted_len)
+				.try_into()
+				.unwrap();
+
+			hmac = [0u8; crate::decrypter::LENGTH_HMAC];
+			data = vec![0u8; 4 + length - crate::decrypter::LENGTH_HMAC];
+
+			// read data and decrypt
+			self.reader.read_exact(&mut data[4..])?;
+			data[0] = encrypted_len[0];
+			data[1] = encrypted_len[1];
+			data[2] = encrypted_len[2];
+			data[3] = encrypted_len[3];
+
+			data = self.decrypter.decrypt(&mut data, true);
+			data = data[4..].to_vec();
+		}
 
 		// read hmac
 		self.reader.read_exact(&mut hmac)?;
@@ -88,6 +110,8 @@ impl InputFile {
 		self.decrypter.verify_mac(&hmac)?;
 		self.decrypter.increase_iv();
 
+		// in the case of frames, we add 4 bytes we have read to determine frame length
+		// (hmac data is already in length included)
 		self.count_byte += length + std::mem::size_of::<u32>();
 
 		Ok(data)

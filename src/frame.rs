@@ -6,6 +6,7 @@ pub enum Frame {
 	Header {
 		salt: Vec<u8>,
 		iv: Vec<u8>,
+		version: u32,
 	},
 	Statement {
 		statement: String,
@@ -35,15 +36,14 @@ pub enum Frame {
 		data: Option<Vec<u8>>,
 	},
 	KeyValue {
-		key_value: crate::Backups::KeyValue
-		    // optional string key          = 1;
-    // optional bytes  blobValue    = 2;
-    // optional bool   booleanValue = 3;
-    // optional float  floatValue   = 4;
-    // optional int32  integerValue = 5;
-    // optional int64  longValue    = 6;
-    // optional string stringValue  = 7;
-	}
+		key_value: crate::Backups::KeyValue, // optional string key          = 1;
+		                                     // optional bytes  blobValue    = 2;
+		                                     // optional bool   booleanValue = 3;
+		                                     // optional float  floatValue   = 4;
+		                                     // optional int32  integerValue = 5;
+		                                     // optional int64  longValue    = 6;
+		                                     // optional string stringValue  = 7;
+	},
 }
 
 impl Frame {
@@ -57,6 +57,7 @@ impl Frame {
 			ret = Some(Self::Header {
 				salt: header.take_salt(),
 				iv: header.take_iv(),
+				version: header.get_version(),
 			});
 		};
 
@@ -140,9 +141,7 @@ impl Frame {
 		if frame.has_keyValue() {
 			fields_count += 1;
 			let key_value = frame.take_keyValue();
-			ret = Some(Self::KeyValue {
-				key_value
-			});
+			ret = Some(Self::KeyValue { key_value });
 		};
 
 		if fields_count != 1 {
@@ -168,7 +167,7 @@ impl Frame {
 impl std::fmt::Display for Frame {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Header { salt, iv } => write!(
+			Self::Header { salt, iv, .. } => write!(
 				f,
 				"Header Frame (salt: {:02X?} (length: {}), iv: {:02X?} (length: {}))",
 				salt,
