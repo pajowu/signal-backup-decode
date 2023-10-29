@@ -8,8 +8,7 @@ syntax = "proto2";
 
 package signal;
 
-option java_package         = "org.thoughtcrime.securesms.backup";
-option java_outer_classname = "BackupProtos";
+option java_package = "org.thoughtcrime.securesms.backup.proto";
 
 message SqlStatement {
     message SqlParameter {
@@ -55,8 +54,9 @@ message DatabaseVersion {
 }
 
 message Header {
-    optional bytes iv   = 1;
-    optional bytes salt = 2;
+    optional bytes  iv      = 1;
+    optional bytes  salt    = 2;
+    optional uint32 version = 3;
 }
 
 message KeyValue {

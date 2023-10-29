@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use anyhow::Context;
+use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 use log::{debug, info};
 use std::convert::TryInto;
@@ -12,6 +13,7 @@ pub struct InputFile {
 	count_frame: usize,
 	count_byte: usize,
 	file_bytes: u64,
+	file_version: u32,
 }
 
 impl InputFile {
@@ -41,7 +43,7 @@ impl InputFile {
 
 		// check that frame is a header and return
 		match &frame {
-			crate::frame::Frame::Header { salt, iv } => Ok(Self {
+			crate::frame::Frame::Header { salt, iv, version } => Ok(Self {
 				reader,
 				decrypter: crate::decrypter::Decrypter::new(&password, &salt, &iv, verify_mac),
 				count_frame: 1,
@@ -50,32 +52,56 @@ impl InputFile {
 				// file. However, I don't know why.
 				count_byte: len + std::mem::size_of::<u32>() + 16,
 				file_bytes,
+				file_version: *version,
 			}),
 			_ => Err(anyhow!("first frame is not a header")),
 		}
 	}
 
-	fn read_data(
-		&mut self,
-		length: usize,
-		read_attachment: bool,
-	) -> Result<Vec<u8>, anyhow::Error> {
+	fn read_decrypt_frame(&mut self) -> Result<Vec<u8>, anyhow::Error> {
 		let mut hmac = [0u8; crate::decrypter::LENGTH_HMAC];
+		let length: usize;
 		let mut data;
 
-		// Reading files (attachments) need an update of MAC with IV.
-		// And their given length corresponds to file length but frame length corresponds
-		// to data length + hmac data.
-		if read_attachment {
-			self.decrypter.mac_update_with_iv();
-			data = vec![0u8; length];
-		} else {
-			data = vec![0u8; length - crate::decrypter::LENGTH_HMAC];
-		}
+		if self.file_version == 0 {
+			// frame length is unencrypted, so read it directly:
+			length = self
+				.reader
+				.read_u32::<byteorder::BigEndian>()
+				.unwrap()
+				.try_into()
+				.unwrap();
 
-		// read data and decrypt
-		self.reader.read_exact(&mut data)?;
-		let data = self.decrypter.decrypt(&mut data);
+			data = vec![0u8; length - crate::decrypter::LENGTH_HMAC];
+
+			// read data and decrypt
+			self.reader.read_exact(&mut data)?;
+			data = self.decrypter.decrypt(&mut data, true);
+		} else {
+			// first read frame length
+			let mut encrypted_len = vec![0u8; 4];
+			self.reader.read_exact(&mut encrypted_len)?;
+
+			// hmac will be updated with the encrypted_len data later
+			let decrypted_len = self.decrypter.decrypt(&encrypted_len, false);
+
+			length = byteorder::BigEndian::read_u32(&decrypted_len)
+				.try_into()
+				.unwrap();
+
+			hmac = [0u8; crate::decrypter::LENGTH_HMAC];
+			data = vec![0u8; 4 + length - crate::decrypter::LENGTH_HMAC];
+
+			// read data and decrypt
+			self.reader.read_exact(&mut data[4..])?;
+			data[0] = encrypted_len[0];
+			data[1] = encrypted_len[1];
+			data[2] = encrypted_len[2];
+			data[3] = encrypted_len[3];
+
+			data = self.decrypter.decrypt(&mut data, true);
+			data = data[4..].to_vec();
+		}
 
 		// read hmac
 		self.reader.read_exact(&mut hmac)?;
@@ -84,45 +110,62 @@ impl InputFile {
 		self.decrypter.verify_mac(&hmac)?;
 		self.decrypter.increase_iv();
 
-		if read_attachment {
-			// we got file length, so we have to add 10 bytes for hmac data
-			self.count_byte += length + crate::decrypter::LENGTH_HMAC;
-		} else {
-			// in the case of frames, we add 4 bytes we have read to determine frame length
-			// (hmac data is already in length included)
-			self.count_byte += length + std::mem::size_of::<u32>();
-		}
+		// in the case of frames, we add 4 bytes we have read to determine frame length
+		// (hmac data is already in length included)
+		self.count_byte += length + std::mem::size_of::<u32>();
+
+		Ok(data)
+	}
+
+	fn read_decrypt_attachment(&mut self, length: usize) -> Result<Vec<u8>, anyhow::Error> {
+		let mut hmac = [0u8; crate::decrypter::LENGTH_HMAC];
+		let mut data;
+
+		// Reading files (attachments) need an update of MAC with IV.
+		// And their given length corresponds to file length but frame length corresponds
+		// to data length + hmac data.
+		self.decrypter.mac_update_with_iv();
+		data = vec![0u8; length];
+
+		// read data and decrypt
+		self.reader.read_exact(&mut data)?;
+		let data = self.decrypter.decrypt(&mut data, true);
+
+		// read hmac
+		self.reader.read_exact(&mut hmac)?;
+
+		// verify mac
+		self.decrypter.verify_mac(&hmac)?;
+		self.decrypter.increase_iv();
+
+		// we got file length, so we have to add 10 bytes for hmac data
+		self.count_byte += length + crate::decrypter::LENGTH_HMAC;
 
 		Ok(data)
 	}
 
 	pub fn read_frame(&mut self) -> Result<crate::frame::Frame, anyhow::Error> {
-		// read frame length from input file
-		let len: usize = self
-			.reader
-			.read_u32::<byteorder::BigEndian>()
-			.unwrap()
-			.try_into()
-			.unwrap();
+		let frame = self.read_decrypt_frame()?;
+
 		debug!(
 			"Read frame number {} with length of {} bytes",
-			self.count_frame, len
+			self.count_frame,
+			frame.len()
 		);
 
 		// create frame
-		let frame = self.read_data(len, false)?;
 		let mut frame: crate::frame::Frame = frame.try_into()?;
 		debug!("Frame type: {}", &frame);
 
 		match frame {
 			crate::frame::Frame::Attachment { data_length, .. } => {
-				frame.set_data(self.read_data(data_length, true)?);
+				frame.set_data(self.read_decrypt_attachment(data_length)?);
 			}
 			crate::frame::Frame::Avatar { data_length, .. } => {
-				frame.set_data(self.read_data(data_length, true)?);
+				frame.set_data(self.read_decrypt_attachment(data_length)?);
 			}
 			crate::frame::Frame::Sticker { data_length, .. } => {
-				frame.set_data(self.read_data(data_length, true)?);
+				frame.set_data(self.read_decrypt_attachment(data_length)?);
 			}
 			crate::frame::Frame::Header { .. } => return Err(anyhow!("unexpected header found")),
 			_ => (),
